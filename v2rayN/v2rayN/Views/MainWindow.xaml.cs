@@ -1,464 +1,294 @@
-using System.Windows.Controls;
+using System;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
-using MaterialDesignThemes.Wpf;
-using v2rayN.Manager;
+using System.Windows.Shapes;
+using ServiceLib.Manager;
+using ServiceLib.Models;
 
-namespace v2rayN.Views;
+// برای استفاده از NotifyIcon ویندوز باید این فضای نام را اضافه کنیم
+// Alias تعریف می‌کنیم تا با کلاس‌های WPF تداخل نداشته باشد
+using WinForms = System.Windows.Forms;
+using Drawing = System.Drawing;
 
-public partial class MainWindow
+namespace v2rayN.Views
 {
-    private static Config _config;
-    private CheckUpdateView? _checkUpdateView;
-    private BackupAndRestoreView? _backupAndRestoreView;
-
-    public MainWindow()
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
     {
-        InitializeComponent();
+        private bool _isConnected = false;
+        private WinForms.NotifyIcon _notifyIcon;
 
-        _config = AppManager.Instance.Config;
-        ThreadPool.RegisterWaitForSingleObject(App.ProgramStarted, OnProgramStarted, null, -1, false);
-
-        App.Current.SessionEnding += Current_SessionEnding;
-        Closing += MainWindow_Closing;
-        PreviewKeyDown += MainWindow_PreviewKeyDown;
-        menuSettingsSetUWP.Click += MenuSettingsSetUWP_Click;
-        menuPromotion.Click += MenuPromotion_Click;
-        menuClose.Click += MenuClose_Click;
-        menuCheckUpdate.Click += MenuCheckUpdate_Click;
-        menuBackupAndRestore.Click += MenuBackupAndRestore_Click;
-
-        ViewModel = new MainWindowViewModel(UpdateViewHandler);
-
-        switch (_config.UiItem.MainGirdOrientation)
+        public MainWindow()
         {
-            case EGirdOrientation.Horizontal:
-                tabProfiles.Content ??= new ProfilesView();
-                tabMsgView.Content ??= new MsgView();
-                tabClashProxies.Content ??= new ClashProxiesView();
-                tabClashConnections.Content ??= new ClashConnectionsView();
-                gridMain.Visibility = Visibility.Visible;
-                break;
+            InitializeComponent();
+            
+            InitializeSystemTray();
 
-            case EGirdOrientation.Vertical:
-                tabProfiles1.Content ??= new ProfilesView();
-                tabMsgView1.Content ??= new MsgView();
-                tabClashProxies1.Content ??= new ClashProxiesView();
-                tabClashConnections1.Content ??= new ClashConnectionsView();
-                gridMain1.Visibility = Visibility.Visible;
-                break;
-
-            case EGirdOrientation.Tab:
-            default:
-                tabProfiles2.Content ??= new ProfilesView();
-                tabMsgView2.Content ??= new MsgView();
-                tabClashProxies2.Content ??= new ClashProxiesView();
-                tabClashConnections2.Content ??= new ClashConnectionsView();
-                gridMain2.Visibility = Visibility.Visible;
-                break;
+            // رویداد بارگذاری صفحه
+            Loaded += MainWindow_Loaded;
+            
+            // اشتراک در رویدادهای منیجر
+            MidPanelManager.Instance.StatusUpdated += UpdateUI;
+            MidPanelManager.Instance.NotificationsReceived += OnNotificationsReceived;
+            MidPanelManager.Instance.LogoutTriggered += OnLogoutTriggered;
         }
-        pbTheme.Content ??= new ThemeSettingView();
 
-        this.WhenActivated(disposables =>
+        private void InitializeSystemTray()
         {
-            //servers
-            this.BindCommand(ViewModel, vm => vm.AddVmessServerCmd, v => v.menuAddVmessServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddVlessServerCmd, v => v.menuAddVlessServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddShadowsocksServerCmd, v => v.menuAddShadowsocksServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddSocksServerCmd, v => v.menuAddSocksServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddHttpServerCmd, v => v.menuAddHttpServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddTrojanServerCmd, v => v.menuAddTrojanServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddHysteria2ServerCmd, v => v.menuAddHysteria2Server).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddTuicServerCmd, v => v.menuAddTuicServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddWireguardServerCmd, v => v.menuAddWireguardServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddAnytlsServerCmd, v => v.menuAddAnytlsServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddCustomServerCmd, v => v.menuAddCustomServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddPolicyGroupServerCmd, v => v.menuAddPolicyGroupServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddProxyChainServerCmd, v => v.menuAddProxyChainServer).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddServerViaClipboardCmd, v => v.menuAddServerViaClipboard).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddServerViaScanCmd, v => v.menuAddServerViaScan).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.AddServerViaImageCmd, v => v.menuAddServerViaImage).DisposeWith(disposables);
-
-            //sub
-            this.BindCommand(ViewModel, vm => vm.SubSettingCmd, v => v.menuSubSetting).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SubUpdateCmd, v => v.menuSubUpdate).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SubUpdateViaProxyCmd, v => v.menuSubUpdateViaProxy).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SubGroupUpdateCmd, v => v.menuSubGroupUpdate).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SubGroupUpdateViaProxyCmd, v => v.menuSubGroupUpdateViaProxy).DisposeWith(disposables);
-
-            //setting
-            this.BindCommand(ViewModel, vm => vm.OptionSettingCmd, v => v.menuOptionSetting).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RoutingSettingCmd, v => v.menuRoutingSetting).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.DNSSettingCmd, v => v.menuDNSSetting).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.FullConfigTemplateCmd, v => v.menuFullConfigTemplate).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.GlobalHotkeySettingCmd, v => v.menuGlobalHotkeySetting).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RebootAsAdminCmd, v => v.menuRebootAsAdmin).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.ClearServerStatisticsCmd, v => v.menuClearServerStatistics).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.OpenTheFileLocationCmd, v => v.menuOpenTheFileLocation).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RegionalPresetDefaultCmd, v => v.menuRegionalPresetsDefault).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RegionalPresetRussiaCmd, v => v.menuRegionalPresetsRussia).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RegionalPresetIranCmd, v => v.menuRegionalPresetsIran).DisposeWith(disposables);
-
-            this.BindCommand(ViewModel, vm => vm.ReloadCmd, v => v.menuReload).DisposeWith(disposables);
-            this.OneWayBind(ViewModel, vm => vm.BlReloadEnabled, v => v.menuReload.IsEnabled).DisposeWith(disposables);
-
-            switch (_config.UiItem.MainGirdOrientation)
+            try
             {
-                case EGirdOrientation.Horizontal:
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabMsgView.Visibility).DisposeWith(disposables);
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashProxies.Visibility).DisposeWith(disposables);
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashConnections.Visibility).DisposeWith(disposables);
-                    this.Bind(ViewModel, vm => vm.TabMainSelectedIndex, v => v.tabMain.SelectedIndex).DisposeWith(disposables);
-                    break;
+                _notifyIcon = new WinForms.NotifyIcon();
+                _notifyIcon.Visible = true;
+                _notifyIcon.Text = "FireNet v2ray Client";
 
-                case EGirdOrientation.Vertical:
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabMsgView1.Visibility).DisposeWith(disposables);
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashProxies1.Visibility).DisposeWith(disposables);
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashConnections1.Visibility).DisposeWith(disposables);
-                    this.Bind(ViewModel, vm => vm.TabMainSelectedIndex, v => v.tabMain1.SelectedIndex).DisposeWith(disposables);
-                    break;
-
-                case EGirdOrientation.Tab:
-                default:
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashProxies2.Visibility).DisposeWith(disposables);
-                    this.OneWayBind(ViewModel, vm => vm.ShowClashUI, v => v.tabClashConnections2.Visibility).DisposeWith(disposables);
-                    this.Bind(ViewModel, vm => vm.TabMainSelectedIndex, v => v.tabMain2.SelectedIndex).DisposeWith(disposables);
-                    break;
-            }
-
-            AppEvents.SendSnackMsgRequested
-              .AsObservable()
-              .ObserveOn(RxApp.MainThreadScheduler)
-              .Subscribe(async content => await DelegateSnackMsg(content))
-              .DisposeWith(disposables);
-
-            AppEvents.AppExitRequested
-              .AsObservable()
-              .ObserveOn(RxApp.MainThreadScheduler)
-              .Subscribe(_ => StorageUI())
-              .DisposeWith(disposables);
-
-            AppEvents.ShutdownRequested
-             .AsObservable()
-             .ObserveOn(RxApp.MainThreadScheduler)
-             .Subscribe(content => Shutdown(content))
-             .DisposeWith(disposables);
-
-            AppEvents.ShowHideWindowRequested
-             .AsObservable()
-             .ObserveOn(RxApp.MainThreadScheduler)
-             .Subscribe(blShow => ShowHideWindow(blShow))
-             .DisposeWith(disposables);
-        });
-
-        Title = $"{Utils.GetVersion()} - {(Utils.IsAdministrator() ? ResUI.RunAsAdmin : ResUI.NotRunAsAdmin)}";
-        if (_config.UiItem.AutoHideStartup)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        if (!_config.GuiItem.EnableHWA)
-        {
-            RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
-        }
-
-        AddHelpMenuItem();
-        WindowsManager.Instance.RegisterGlobalHotkey(_config, OnHotkeyHandler, null);
-    }
-
-    #region Event
-
-    private void OnProgramStarted(object state, bool timeout)
-    {
-        Application.Current?.Dispatcher.Invoke((Action)(() =>
-        {
-            ShowHideWindow(true);
-        }));
-    }
-
-    private async Task DelegateSnackMsg(string content)
-    {
-        MainSnackbar.MessageQueue?.Enqueue(content);
-        await Task.CompletedTask;
-    }
-
-    private async Task<bool> UpdateViewHandler(EViewAction action, object? obj)
-    {
-        switch (action)
-        {
-            case EViewAction.AddServerWindow:
-                if (obj is null)
+                // تلاش برای استخراج آیکون برنامه برای نمایش در تری
+                var appPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+                if (!string.IsNullOrEmpty(appPath))
                 {
-                    return false;
+                    _notifyIcon.Icon = Drawing.Icon.ExtractAssociatedIcon(appPath);
+                }
+                else
+                {
+                    _notifyIcon.Icon = Drawing.SystemIcons.Application;
                 }
 
-                return new AddServerWindow((ProfileItem)obj).ShowDialog() ?? false;
-
-            case EViewAction.AddServer2Window:
-                if (obj is null)
+                // باز کردن برنامه با کلیک روی آیکون
+                _notifyIcon.DoubleClick += (s, e) => 
                 {
-                    return false;
+                    this.Show();
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+                };
+            }
+            catch (Exception ex)
+            {
+                // اگر خطایی در ایجاد آیکون رخ داد، برنامه نباید کرش کند
+                Debug.WriteLine($"Error init tray: {ex.Message}");
+            }
+        }
+
+        private void OnNotificationsReceived(NotificationFetchResponse response)
+        {
+            if (_notifyIcon == null || response?.Notifications == null) return;
+
+            foreach (var note in response.Notifications)
+            {
+                // نمایش نوتیفیکیشن ویندوز
+                _notifyIcon.ShowBalloonTip(
+                    5000, // زمان نمایش به میلی‌ثانیه
+                    note.Title ?? "Notification", 
+                    note.Body ?? "", 
+                    WinForms.ToolTipIcon.Info
+                );
+            }
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (MidPanelManager.Instance.CurrentStatus != null)
+            {
+                UpdateUI(MidPanelManager.Instance.CurrentStatus);
+            }
+            else
+            {
+                 _ = MidPanelManager.Instance.RefreshStatus();
+            }
+        }
+
+        private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ButtonState == MouseButtonState.Pressed)
+            {
+                this.DragMove();
+            }
+        }
+
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            // بستن کامل برنامه و پاکسازی آیکون تری
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+            }
+            Application.Current.Shutdown();
+        }
+
+        private void UpdateUI(StatusResponse status)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (status == null) return;
+
+                txtUsername.Text = status.Username ?? "User";
+                
+                bool isActive = status.Status?.ToLower() == "active";
+                txtStatus.Text = isActive ? "ACTIVE" : "EXPIRED";
+                txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
+                borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
+
+                double totalGB = status.DataLimit / 1073741824.0;
+                double usedGB = status.UsedTraffic / 1073741824.0;
+                double remainingGB = totalGB - usedGB;
+                if (remainingGB < 0) remainingGB = 0;
+
+                txtRemainingData.Text = $"{remainingGB:0.##} GB";
+                txtTotalData.Text = $"Total: {totalGB:0.##} GB";
+
+                double usagePercent = (status.DataLimit > 0) ? (double)status.UsedTraffic / status.DataLimit : 1;
+                double remainingPercent = 1.0 - usagePercent;
+                if (remainingPercent < 0) remainingPercent = 0;
+
+                DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
+
+                if (status.Expire > 0)
+                {
+                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire).LocalDateTime;
+                    txtExpireDate.Text = $"Expire: {expireDate:yyyy-MM-dd}";
+
+                    TimeSpan left = expireDate - DateTime.Now;
+                    int daysLeft = left.Days;
+                    if (daysLeft < 0) daysLeft = 0;
+
+                    txtRemainingDays.Text = daysLeft.ToString();
+
+                    double daysPercent = (daysLeft > 30) ? 1.0 : (double)daysLeft / 30.0;
+                    DrawCircularProgress(pathDaysArc, daysPercent, "#5255ca");
+                }
+                else
+                {
+                    txtRemainingDays.Text = "∞";
+                    txtExpireDate.Text = "No Expiry";
+                    DrawCircularProgress(pathDaysArc, 1.0, "#5255ca");
                 }
 
-                return new AddServer2Window((ProfileItem)obj).ShowDialog() ?? false;
+                CheckForUpdate(status);
+            });
+        }
 
-            case EViewAction.AddGroupServerWindow:
-                if (obj is null)
+        private void DrawCircularProgress(Path pathObj, double percentage, string colorHex)
+        {
+            if (percentage > 0.999) percentage = 0.9999;
+
+            double angle = percentage * 360;
+            double radius = 40;
+            double startAngle = -90;
+            double endAngle = startAngle + angle;
+
+            Point startPoint = new Point(
+                radius + radius * Math.Cos(startAngle * Math.PI / 180),
+                radius + radius * Math.Sin(startAngle * Math.PI / 180));
+
+            Point endPoint = new Point(
+                radius + radius * Math.Cos(endAngle * Math.PI / 180),
+                radius + radius * Math.Sin(endAngle * Math.PI / 180));
+
+            bool isLargeArc = angle > 180;
+
+            PathFigure figure = new PathFigure();
+            figure.StartPoint = startPoint;
+            figure.Segments.Add(new ArcSegment(
+                endPoint,
+                new Size(radius, radius),
+                0,
+                isLargeArc,
+                SweepDirection.Clockwise,
+                true));
+
+            PathGeometry geometry = new PathGeometry();
+            geometry.Figures.Add(figure);
+
+            pathObj.Data = geometry;
+            pathObj.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
+        }
+
+        private void CheckForUpdate(StatusResponse status)
+        {
+            if (status.NeedToUpdate)
+            {
+                popupContainer.Visibility = Visibility.Visible;
+                if (status.IsIgnoreable)
                 {
-                    return false;
+                    btnUpdateLater.Visibility = Visibility.Visible;
                 }
-
-                return new AddGroupServerWindow((ProfileItem)obj).ShowDialog() ?? false;
-
-            case EViewAction.DNSSettingWindow:
-                return new DNSSettingWindow().ShowDialog() ?? false;
-
-            case EViewAction.RoutingSettingWindow:
-                return new RoutingSettingWindow().ShowDialog() ?? false;
-
-            case EViewAction.OptionSettingWindow:
-                return new OptionSettingWindow().ShowDialog() ?? false;
-
-            case EViewAction.FullConfigTemplateWindow:
-                return new FullConfigTemplateWindow().ShowDialog() ?? false;
-
-            case EViewAction.GlobalHotkeySettingWindow:
-                return new GlobalHotkeySettingWindow().ShowDialog() ?? false;
-
-            case EViewAction.SubSettingWindow:
-                return new SubSettingWindow().ShowDialog() ?? false;
-
-            case EViewAction.ScanScreenTask:
-                await ScanScreenTaskAsync();
-                break;
-
-            case EViewAction.ScanImageTask:
-                await ScanImageTaskAsync();
-                break;
-
-            case EViewAction.AddServerViaClipboard:
-                await AddServerViaClipboardAsync();
-                break;
-        }
-
-        return await Task.FromResult(true);
-    }
-
-    private void OnHotkeyHandler(EGlobalHotkey e)
-    {
-        switch (e)
-        {
-            case EGlobalHotkey.ShowForm:
-                ShowHideWindow(null);
-                break;
-
-            case EGlobalHotkey.SystemProxyClear:
-            case EGlobalHotkey.SystemProxySet:
-            case EGlobalHotkey.SystemProxyUnchanged:
-            case EGlobalHotkey.SystemProxyPac:
-                AppEvents.SysProxyChangeRequested.Publish((ESysProxyType)((int)e - 1));
-                break;
-        }
-    }
-
-    private void MainWindow_Closing(object? sender, CancelEventArgs e)
-    {
-        e.Cancel = true;
-        ShowHideWindow(false);
-    }
-
-    private async void Current_SessionEnding(object sender, SessionEndingCancelEventArgs e)
-    {
-        Logging.SaveLog("Current_SessionEnding");
-        StorageUI();
-        await AppManager.Instance.AppExitAsync(false);
-    }
-
-    private void Shutdown(bool obj)
-    {
-        Application.Current.Shutdown();
-    }
-
-    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
-        {
-            switch (e.Key)
+                else
+                {
+                    btnUpdateLater.Visibility = Visibility.Collapsed;
+                }
+                MidPanelManager.Instance.ReportPromptSeen();
+            }
+            else
             {
-                case Key.V:
-                    if (Keyboard.FocusedElement is TextBox)
-                    {
-                        return;
-                    }
-                    AddServerViaClipboardAsync().ContinueWith(_ => { });
-
-                    break;
-
-                case Key.S:
-                    ScanScreenTaskAsync().ContinueWith(_ => { });
-                    break;
+                popupContainer.Visibility = Visibility.Collapsed;
             }
         }
-        else
+
+        private void BtnUpdateNow_Click(object sender, RoutedEventArgs e)
         {
-            if (e.Key == Key.F5)
+            try 
             {
-                ViewModel?.Reload();
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://your-server.com/download-latest", 
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
+        private void BtnUpdateLater_Click(object sender, RoutedEventArgs e)
+        {
+            popupContainer.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnConnect_Click(object sender, RoutedEventArgs e)
+        {
+            _isConnected = !_isConnected;
+
+            if (_isConnected)
+            {
+                txtConnectionState.Text = "CONNECTED";
+                txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
+                btnConnect.Opacity = 1.0;
+                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(49, 128, 229);
+            }
+            else
+            {
+                txtConnectionState.Text = "DISCONNECTED";
+                txtConnectionState.Foreground = Brushes.White;
+                btnConnect.Opacity = 0.8;
+                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(82, 85, 202); // #5255ca
             }
         }
-    }
 
-    private void MenuClose_Click(object sender, RoutedEventArgs e)
-    {
-        StorageUI();
-        ShowHideWindow(false);
-    }
-
-    private void MenuPromotion_Click(object sender, RoutedEventArgs e)
-    {
-        ProcUtils.ProcessStart($"{Utils.Base64Decode(Global.PromotionUrl)}?t={DateTime.Now.Ticks}");
-    }
-
-    private void MenuSettingsSetUWP_Click(object sender, RoutedEventArgs e)
-    {
-        ProcUtils.ProcessStart(Utils.GetBinPath("EnableLoopback.exe"));
-    }
-
-    public async Task AddServerViaClipboardAsync()
-    {
-        var clipboardData = WindowsUtils.GetClipboardData();
-        if (clipboardData.IsNotEmpty() && ViewModel != null)
+        private async void BtnLogout_Click(object sender, RoutedEventArgs e)
         {
-            await ViewModel.AddServerViaClipboardAsync(clipboardData);
-        }
-    }
-
-    private async Task ScanScreenTaskAsync()
-    {
-        ShowHideWindow(false);
-
-        if (Application.Current?.MainWindow is Window window)
-        {
-            var bytes = QRCodeWindowsUtils.CaptureScreen(window);
-            await ViewModel?.ScanScreenResult(bytes);
-        }
-
-        ShowHideWindow(true);
-    }
-
-    private async Task ScanImageTaskAsync()
-    {
-        if (UI.OpenFileDialog(out var fileName, "PNG|*.png|All|*.*") != true)
-        {
-            return;
-        }
-        if (fileName.IsNullOrEmpty())
-        {
-            return;
-        }
-        await ViewModel?.ScanImageResult(fileName);
-    }
-
-    private void MenuCheckUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        _checkUpdateView ??= new CheckUpdateView();
-        DialogHost.Show(_checkUpdateView, "RootDialog");
-    }
-
-    private void MenuBackupAndRestore_Click(object sender, RoutedEventArgs e)
-    {
-        _backupAndRestoreView ??= new BackupAndRestoreView();
-        DialogHost.Show(_backupAndRestoreView, "RootDialog");
-    }
-
-    #endregion Event
-
-    #region UI
-
-    public void ShowHideWindow(bool? blShow)
-    {
-        var bl = blShow ?? !AppManager.Instance.ShowInTaskbar;
-        if (bl)
-        {
-            this?.Show();
-            if (this?.WindowState == WindowState.Minimized)
+            // حذف آیکون تری قبل از خروج
+            if (_notifyIcon != null)
             {
-                WindowState = WindowState.Normal;
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
             }
-            this?.Activate();
-            this?.Focus();
+            await MidPanelManager.Instance.LogoutAsync();
         }
-        else
-        {
-            this?.Hide();
-        }
-        AppManager.Instance.ShowInTaskbar = bl;
-    }
 
-    protected override void OnLoaded(object? sender, RoutedEventArgs e)
-    {
-        base.OnLoaded(sender, e);
-        if (_config.UiItem.AutoHideStartup)
+        private void OnLogoutTriggered()
         {
-            ShowHideWindow(false);
-        }
-        RestoreUI();
-    }
-
-    private void RestoreUI()
-    {
-        if (_config.UiItem.MainGirdHeight1 > 0 && _config.UiItem.MainGirdHeight2 > 0)
-        {
-            if (_config.UiItem.MainGirdOrientation == EGirdOrientation.Horizontal)
+            Dispatcher.Invoke(() =>
             {
-                gridMain.ColumnDefinitions[0].Width = new GridLength(_config.UiItem.MainGirdHeight1, GridUnitType.Star);
-                gridMain.ColumnDefinitions[2].Width = new GridLength(_config.UiItem.MainGirdHeight2, GridUnitType.Star);
-            }
-            else if (_config.UiItem.MainGirdOrientation == EGirdOrientation.Vertical)
-            {
-                gridMain1.RowDefinitions[0].Height = new GridLength(_config.UiItem.MainGirdHeight1, GridUnitType.Star);
-                gridMain1.RowDefinitions[2].Height = new GridLength(_config.UiItem.MainGirdHeight2, GridUnitType.Star);
-            }
+                new LoginWindow().Show();
+                this.Close();
+            });
         }
     }
-
-    private void StorageUI()
-    {
-        ConfigHandler.SaveWindowSizeItem(_config, GetType().Name, Width, Height);
-
-        if (_config.UiItem.MainGirdOrientation == EGirdOrientation.Horizontal)
-        {
-            ConfigHandler.SaveMainGirdHeight(_config, gridMain.ColumnDefinitions[0].ActualWidth, gridMain.ColumnDefinitions[2].ActualWidth);
-        }
-        else if (_config.UiItem.MainGirdOrientation == EGirdOrientation.Vertical)
-        {
-            ConfigHandler.SaveMainGirdHeight(_config, gridMain1.RowDefinitions[0].ActualHeight, gridMain1.RowDefinitions[2].ActualHeight);
-        }
-    }
-
-    private void AddHelpMenuItem()
-    {
-        var coreInfo = CoreInfoManager.Instance.GetCoreInfo();
-        foreach (var it in coreInfo
-            .Where(t => t.CoreType is not ECoreType.v2fly
-                        and not ECoreType.hysteria))
-        {
-            var item = new MenuItem()
-            {
-                Tag = it.Url.Replace(@"/releases", ""),
-                Header = string.Format(ResUI.menuWebsiteItem, it.CoreType.ToString().Replace("_", " ")).UpperFirstChar()
-            };
-            item.Click += MenuItem_Click;
-            menuHelp.Items.Add(item);
-        }
-    }
-
-    private void MenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem item)
-        {
-            ProcUtils.ProcessStart(item.Tag.ToString());
-        }
-    }
-
-    #endregion UI
 }
