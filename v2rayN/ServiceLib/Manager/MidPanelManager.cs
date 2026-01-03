@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using System.Timers;
+// حذف using System.Timers; برای جلوگیری از ابهام، مستقیماً در کد استفاده می‌کنیم
 using ServiceLib.Models;
 using ServiceLib.Services;
 
@@ -12,9 +12,10 @@ namespace ServiceLib.Manager
         private static MidPanelManager _instance;
         public static MidPanelManager Instance => _instance ??= new MidPanelManager();
 
-        private Timer _keepAliveTimer;
-        private Timer _statusRefreshTimer;
-        private Timer _notificationTimer;
+        // رفع ابهام: استفاده صریح از System.Timers.Timer
+        private System.Timers.Timer _keepAliveTimer;
+        private System.Timers.Timer _statusRefreshTimer;
+        private System.Timers.Timer _notificationTimer;
         
         // نام فایل ذخیره توکن
         private const string TokenFileName = "session_token.dat";
@@ -37,14 +38,14 @@ namespace ServiceLib.Manager
         private void InitializeTimers()
         {
             // تایمر Keep-alive: هر 1 ساعت یکبار (پنجره سرور 48 ساعت است، 1 ساعت کاملا امن است)
-            _keepAliveTimer = new Timer(3600000); 
+            _keepAliveTimer = new System.Timers.Timer(3600000); 
             _keepAliveTimer.Elapsed += async (s, e) => await PerformKeepAlive();
 
             // تایمر به‌روزرسانی وضعیت و نوتیفیکیشن: هر 5 دقیقه (طبق درخواست شما)
-            _statusRefreshTimer = new Timer(300000); // 5 دقیقه
+            _statusRefreshTimer = new System.Timers.Timer(300000); // 5 دقیقه
             _statusRefreshTimer.Elapsed += async (s, e) => await RefreshStatus();
 
-            _notificationTimer = new Timer(300000); // 5 دقیقه
+            _notificationTimer = new System.Timers.Timer(300000); // 5 دقیقه
             _notificationTimer.Elapsed += async (s, e) => await CheckNotifications();
         }
 
