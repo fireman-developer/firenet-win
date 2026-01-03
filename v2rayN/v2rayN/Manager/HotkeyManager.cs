@@ -67,7 +67,7 @@ public sealed class HotkeyManager
             var isSuccess = false;
             var msg = string.Empty;
 
-            Application.Current?.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 isSuccess = RegisterHotKey(nint.Zero, _hotkeyCode, hotkeyInfo.fsModifiers, hotkeyInfo.vKey);
             });
@@ -91,7 +91,7 @@ public sealed class HotkeyManager
     {
         foreach (var hotkey in _hotkeyTriggerDic.Keys)
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 UnregisterHotKey(nint.Zero, hotkey);
             });
@@ -144,7 +144,7 @@ public sealed class HotkeyManager
         var hotKeyCode = (int)msg.lParam;
         if (IsPause)
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 if (Keyboard.FocusedElement is UIElement element)
                 {

@@ -24,7 +24,7 @@ public class ThemeSettingViewModel : MyReactiveObject
     {
         _config = AppManager.Instance.Config;
 
-        RegisterSystemColorSet(_config, Application.Current.MainWindow, ModifyTheme);
+        RegisterSystemColorSet(_config, System.Windows.Application.Current.MainWindow, ModifyTheme);
 
         BindingUI();
         RestoreUI();
@@ -131,7 +131,7 @@ public class ThemeSettingViewModel : MyReactiveObject
         theme.SetBaseTheme(baseTheme);
         _paletteHelper.SetTheme(theme);
 
-        WindowsUtils.SetDarkBorder(Application.Current.MainWindow, CurrentTheme);
+        WindowsUtils.SetDarkBorder(System.Windows.Application.Current.MainWindow, CurrentTheme);
     }
 
     private void ModifyFontSize()
@@ -142,9 +142,9 @@ public class ThemeSettingViewModel : MyReactiveObject
             return;
         }
 
-        Application.Current.Resources["StdFontSize"] = size;
-        Application.Current.Resources["StdFontSize1"] = size + 1;
-        Application.Current.Resources["StdFontSize-1"] = size - 1;
+        System.Windows.Application.Current.Resources["StdFontSize"] = size;
+        System.Windows.Application.Current.Resources["StdFontSize1"] = size + 1;
+        System.Windows.Application.Current.Resources["StdFontSize-1"] = size - 1;
     }
 
     public void ChangePrimaryColor(System.Windows.Media.Color color)

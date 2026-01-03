@@ -14,10 +14,10 @@ internal static class WindowsUtils
         var strData = string.Empty;
         try
         {
-            var data = Clipboard.GetDataObject();
-            if (data?.GetDataPresent(DataFormats.UnicodeText) == true)
+            var data = System.Windows.Clipboard.GetDataObject();
+            if (data?.GetDataPresent(System.Windows.DataFormats.UnicodeText) == true)
             {
-                strData = data.GetData(DataFormats.UnicodeText)?.ToString();
+                strData = data.GetData(System.Windows.DataFormats.UnicodeText)?.ToString();
             }
             return strData;
         }
@@ -32,7 +32,7 @@ internal static class WindowsUtils
     {
         try
         {
-            Clipboard.SetText(strData);
+            System.Windows.Clipboard.SetText(strData);
         }
         catch
         {

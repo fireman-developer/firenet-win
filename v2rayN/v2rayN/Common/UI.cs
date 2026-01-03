@@ -8,19 +8,19 @@ internal class UI
 
     public static void Show(string msg)
     {
-        MessageBox.Show(msg, caption, MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
+        System.Windows.MessageBox.Show(msg, caption, MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
     }
 
     public static MessageBoxResult ShowYesNo(string msg)
     {
-        return MessageBox.Show(msg, caption, MessageBoxButton.YesNo, MessageBoxImage.Question);
+        return System.Windows.MessageBox.Show(msg, caption, MessageBoxButton.YesNo, MessageBoxImage.Question);
     }
 
     public static bool? OpenFileDialog(out string fileName, string filter)
     {
         fileName = string.Empty;
 
-        var fileDialog = new OpenFileDialog
+        var fileDialog = new Microsoft.Win32.OpenFileDialog
         {
             Multiselect = false,
             Filter = filter
@@ -39,7 +39,7 @@ internal class UI
     {
         fileName = string.Empty;
 
-        SaveFileDialog fileDialog = new()
+        Microsoft.Win32.SaveFileDialog fileDialog = new()
         {
             Filter = filter,
             FilterIndex = 2,
