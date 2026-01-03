@@ -1,11 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Windows;
-using System.Windows.Controls; // این خط اضافه شد تا Grid شناخته شود
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using System.Windows.Shapes; 
+using System.Windows.Shapes;
 using ServiceLib.Manager;
 using ServiceLib.Models;
 
@@ -248,19 +248,31 @@ namespace v2rayN.Views
         {
             _isConnected = !_isConnected;
 
+            // اصلاح ارور کستینگ: دریافت دقیق المنت‌ها از تمپلت دکمه
+            var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
+            var dropShadow = outerRing?.Effect as DropShadowEffect;
+
             if (_isConnected)
             {
                 txtConnectionState.Text = "CONNECTED";
                 txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
                 btnConnect.Opacity = 1.0;
-                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(49, 128, 229);
+                
+                if (dropShadow != null)
+                {
+                    dropShadow.Color = Color.FromRgb(49, 128, 229);
+                }
             }
             else
             {
                 txtConnectionState.Text = "DISCONNECTED";
                 txtConnectionState.Foreground = Brushes.White;
                 btnConnect.Opacity = 0.8;
-                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(82, 85, 202); 
+                
+                if (dropShadow != null)
+                {
+                    dropShadow.Color = Color.FromRgb(82, 85, 202); 
+                }
             }
         }
 
