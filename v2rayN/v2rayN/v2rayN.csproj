@@ -12,6 +12,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Using Remove="System.Windows.Forms" />
+		<Using Remove="System.Drawing" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="MaterialDesignThemes" />
 		<PackageReference Include="H.NotifyIcon.Wpf" />
 		<PackageReference Include="ReactiveUI.Fody">
