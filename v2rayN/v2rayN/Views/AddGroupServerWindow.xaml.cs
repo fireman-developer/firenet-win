@@ -1,3 +1,13 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
+using v2rayN.Base;
+using v2rayN.ViewModels;
+
 namespace v2rayN.Views;
 
 public partial class AddGroupServerWindow
@@ -75,7 +85,8 @@ public partial class AddGroupServerWindow
         txtRemarks.Focus();
     }
 
-    private void AddGroupServerWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void AddGroupServerWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (!lstChild.IsKeyboardFocusWithin)
         {
@@ -96,19 +107,15 @@ public partial class AddGroupServerWindow
                 case Key.T:
                     ViewModel?.MoveServer(EMove.Top);
                     break;
-
                 case Key.U:
                     ViewModel?.MoveServer(EMove.Up);
                     break;
-
                 case Key.D:
                     ViewModel?.MoveServer(EMove.Down);
                     break;
-
                 case Key.B:
                     ViewModel?.MoveServer(EMove.Bottom);
                     break;
-
                 case Key.Delete:
                 case Key.Back:
                     ViewModel?.ChildRemoveAsync();

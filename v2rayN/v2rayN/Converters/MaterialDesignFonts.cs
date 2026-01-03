@@ -1,10 +1,12 @@
+using System;
 using System.Windows.Media;
 
 namespace v2rayN.Converters;
 
 public class MaterialDesignFonts
 {
-    public static FontFamily MyFont { get; }
+    // رفع ابهام FontFamily
+    public static System.Windows.Media.FontFamily MyFont { get; }
 
     static MaterialDesignFonts()
     {
@@ -14,12 +16,12 @@ public class MaterialDesignFonts
             if (fontFamily.IsNotEmpty())
             {
                 var fontPath = Utils.GetFontsPath();
-                MyFont = new FontFamily(new Uri(@$"file:///{fontPath}\"), $"./#{fontFamily}");
+                MyFont = new System.Windows.Media.FontFamily(new Uri(@$"file:///{fontPath}\"), $"./#{fontFamily}");
             }
         }
         catch
         {
         }
-        MyFont ??= new FontFamily("Microsoft YaHei");
+        MyFont ??= new System.Windows.Media.FontFamily("Microsoft YaHei");
     }
 }

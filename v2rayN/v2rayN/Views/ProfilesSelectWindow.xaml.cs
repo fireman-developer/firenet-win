@@ -1,6 +1,16 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
 using v2rayN.Base;
+using v2rayN.Common;
+using v2rayN.ViewModels;
 
 namespace v2rayN.Views;
 
@@ -60,7 +70,6 @@ public partial class ProfilesSelectWindow
         }
     }
 
-    // Expose ConfigType filter controls to callers
     public void SetConfigTypeFilter(IEnumerable<EConfigType> types, bool exclude = false)
         => ViewModel?.SetConfigTypeFilter(types, exclude);
 
@@ -116,7 +125,8 @@ public partial class ProfilesSelectWindow
         lstProfiles.SelectAll();
     }
 
-    private void LstProfiles_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void LstProfiles_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
@@ -158,7 +168,8 @@ public partial class ProfilesSelectWindow
         }
     }
 
-    private void TxtServerFilter_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void TxtServerFilter_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key is Key.Enter or Key.Return)
         {
@@ -181,7 +192,6 @@ public partial class ProfilesSelectWindow
 
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
-        // Trigger selection finalize when Confirm is clicked
         ViewModel?.SelectFinish();
     }
 

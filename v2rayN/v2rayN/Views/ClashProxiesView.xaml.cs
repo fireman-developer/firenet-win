@@ -1,8 +1,12 @@
+using System.Threading.Tasks;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
+using v2rayN.Base;
+using v2rayN.ViewModels;
+
 namespace v2rayN.Views;
 
-/// <summary>
-/// Interaction logic for ProxiesView.xaml
-/// </summary>
 public partial class ClashProxiesView
 {
     public ClashProxiesView()
@@ -36,7 +40,8 @@ public partial class ClashProxiesView
         return await Task.FromResult(true);
     }
 
-    private void ProxiesView_KeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void ProxiesView_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         switch (e.Key)
         {

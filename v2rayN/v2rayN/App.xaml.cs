@@ -1,5 +1,12 @@
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using ServiceLib.Manager;
+using v2rayN.Common;
 using v2rayN.Views;
 
 namespace v2rayN
@@ -7,31 +14,78 @@ namespace v2rayN
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>
-    public partial class App : Application
+    // رفع ابهام با استفاده از System.Windows.Application
+    public partial class App : System.Windows.Application
     {
+        public static EventWaitHandle ProgramStarted;
+
         public App()
         {
-            // سازنده پیش‌فرض
+            DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
         }
 
         protected override async void OnStartup(StartupEventArgs e)
         {
+            var exePathKey = Utils.GetMd5(Utils.GetExePath());
+            var rebootas = (e.Args ?? Array.Empty<string>()).Any(t => t == Global.RebootAs);
+            ProgramStarted = new EventWaitHandle(false, EventResetMode.AutoReset, exePathKey, out var bCreatedNew);
+            
+            if (!rebootas && !bCreatedNew)
+            {
+                ProgramStarted.Set();
+                Environment.Exit(0);
+                return;
+            }
+
+            if (!AppManager.Instance.InitApp())
+            {
+                UI.Show($"Loading GUI configuration file is abnormal,please restart the application{Environment.NewLine}加载GUI配置文件异常,请重启应用");
+                Environment.Exit(0);
+                return;
+            }
+
+            AppManager.Instance.InitComponents();
+            
             base.OnStartup(e);
 
-            // تلاش برای بازیابی نشست قبلی (Session Restore)
-            // اگر توکن معتبر ذخیره شده باشد، true برمی‌گرداند
+            // لاجیک جدید لاگین
             bool isSessionRestored = await MidPanelManager.Instance.TryRestoreSessionAsync();
-
             if (isSessionRestored)
             {
-                // اگر کاربر قبلاً لاگین کرده و توکن معتبر است، مستقیم به صفحه اصلی برود
                 new MainWindow().Show();
             }
             else
             {
-                // در غیر این صورت، صفحه لاگین را نمایش بده
                 new LoginWindow().Show();
             }
+        }
+
+        private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            Logging.SaveLog("App_DispatcherUnhandledException", e.Exception);
+            e.Handled = true;
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject != null)
+            {
+                Logging.SaveLog("CurrentDomain_UnhandledException", (Exception)e.ExceptionObject);
+            }
+        }
+
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Logging.SaveLog("TaskScheduler_UnobservedTaskException", e.Exception);
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            Logging.SaveLog("OnExit");
+            base.OnExit(e);
+            Process.GetCurrentProcess().Kill();
         }
     }
 }

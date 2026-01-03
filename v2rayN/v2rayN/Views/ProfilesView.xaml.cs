@@ -1,8 +1,18 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
+using ReactiveUI;
+using System.Reactive.Linq;
+using System.Reactive.Disposables;
 using v2rayN.Base;
+using v2rayN.Common;
+using v2rayN.ViewModels;
 using Point = System.Windows.Point;
 
 namespace v2rayN.Views;
@@ -108,11 +118,7 @@ public partial class ProfilesView
         switch (action)
         {
             case EViewAction.SetClipboardData:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 WindowsUtils.SetClipboardData((string)obj);
                 break;
 
@@ -121,64 +127,34 @@ public partial class ProfilesView
                 break;
 
             case EViewAction.ShowYesNo:
-                if (UI.ShowYesNo(ResUI.RemoveServer) == MessageBoxResult.No)
-                {
-                    return false;
-                }
+                if (UI.ShowYesNo(ResUI.RemoveServer) == MessageBoxResult.No) return false;
                 break;
 
             case EViewAction.SaveFileDialog:
-                if (obj is null)
-                {
-                    return false;
-                }
-
-                if (UI.SaveFileDialog(out var fileName, "Config|*.json") != true)
-                {
-                    return false;
-                }
+                if (obj is null) return false;
+                if (UI.SaveFileDialog(out var fileName, "Config|*.json") != true) return false;
                 ViewModel?.Export2ClientConfigResult(fileName, (ProfileItem)obj);
                 break;
 
             case EViewAction.AddServerWindow:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 return new AddServerWindow((ProfileItem)obj).ShowDialog() ?? false;
 
             case EViewAction.AddServer2Window:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 return new AddServer2Window((ProfileItem)obj).ShowDialog() ?? false;
 
             case EViewAction.AddGroupServerWindow:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 return new AddGroupServerWindow((ProfileItem)obj).ShowDialog() ?? false;
 
             case EViewAction.ShareServer:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 ShareServer((string)obj);
                 break;
 
             case EViewAction.SubEditWindow:
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 return new SubEditWindow((SubItem)obj).ShowDialog() ?? false;
 
             case EViewAction.DispatcherRefreshServersBiz:
@@ -237,10 +213,7 @@ public partial class ProfilesView
     private void LstProfiles_ColumnHeader_Click(object sender, RoutedEventArgs e)
     {
         var colHeader = sender as DataGridColumnHeader;
-        if (colHeader == null || colHeader.TabIndex < 0 || colHeader.Column == null)
-        {
-            return;
-        }
+        if (colHeader == null || colHeader.TabIndex < 0 || colHeader.Column == null) return;
 
         var colName = ((MyDGTextColumn)colHeader.Column).ExName;
         ViewModel?.SortServer(colName);
@@ -251,7 +224,8 @@ public partial class ProfilesView
         lstProfiles.SelectAll();
     }
 
-    private void LstProfiles_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void LstProfiles_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
@@ -260,31 +234,24 @@ public partial class ProfilesView
                 case Key.A:
                     menuSelectAll_Click(null, null);
                     break;
-
                 case Key.C:
                     ViewModel?.Export2ShareUrlAsync(false);
                     break;
-
                 case Key.D:
                     ViewModel?.EditServerAsync();
                     break;
-
                 case Key.F:
                     ViewModel?.ShareServerAsync();
                     break;
-
                 case Key.O:
                     ViewModel?.ServerSpeedtest(ESpeedActionType.Tcping);
                     break;
-
                 case Key.R:
                     ViewModel?.ServerSpeedtest(ESpeedActionType.Realping);
                     break;
-
                 case Key.T:
                     ViewModel?.ServerSpeedtest(ESpeedActionType.Speedtest);
                     break;
-
                 case Key.E:
                     ViewModel?.ServerSpeedtest(ESpeedActionType.Mixedtest);
                     break;
@@ -295,31 +262,24 @@ public partial class ProfilesView
             switch (e.Key)
             {
                 case Key.Enter:
-                    //case Key.Return:
                     ViewModel?.SetDefaultServer();
                     break;
-
                 case Key.Delete:
                 case Key.Back:
                     ViewModel?.RemoveServerAsync();
                     break;
-
                 case Key.T:
                     ViewModel?.MoveServer(EMove.Top);
                     break;
-
                 case Key.U:
                     ViewModel?.MoveServer(EMove.Up);
                     break;
-
                 case Key.D:
                     ViewModel?.MoveServer(EMove.Down);
                     break;
-
                 case Key.B:
                     ViewModel?.MoveServer(EMove.Bottom);
                     break;
-
                 case Key.Escape:
                     ViewModel?.ServerSpeedtestStop();
                     break;
@@ -347,7 +307,8 @@ public partial class ProfilesView
         }
     }
 
-    private void TxtServerFilter_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void TxtServerFilter_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key is Key.Enter or Key.Return)
         {
@@ -411,20 +372,11 @@ public partial class ProfilesView
     private int startIndex = -1;
     private string formatData = "ProfileItemModel";
 
-    /// <summary>
-    /// Helper to search up the VisualTree
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="current"></param>
-    /// <returns></returns>
     private static T? FindAncestor<T>(DependencyObject current) where T : DependencyObject
     {
         do
         {
-            if (current is T)
-            {
-                return (T)current;
-            }
+            if (current is T) return (T)current;
             current = VisualTreeHelper.GetParent(current);
         }
         while (current != null);
@@ -433,13 +385,11 @@ public partial class ProfilesView
 
     private void LstProfiles_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // Get current mouse position
         startPoint = e.GetPosition(null);
     }
 
     private void LstProfiles_MouseMove(object sender, MouseEventArgs e)
     {
-        // Get the current mouse position
         var mousePos = e.GetPosition(null);
         var diff = startPoint - mousePos;
 
@@ -447,24 +397,13 @@ public partial class ProfilesView
             (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance))
         {
-            // Get the dragged Item
-            if (sender is not DataGrid listView)
-            {
-                return;
-            }
+            if (sender is not DataGrid listView) return;
 
             var listViewItem = FindAncestor<DataGridRow>((DependencyObject)e.OriginalSource);
-            if (listViewItem == null)
-            {
-                return;           // Abort
-            }
-            // Find the data behind the ListViewItem
+            if (listViewItem == null) return;
             var item = (ProfileItemModel)listView.ItemContainerGenerator.ItemFromContainer(listViewItem);
-            if (item == null)
-            {
-                return;                   // Abort
-            }
-            // Initialize the drag & drop operation
+            if (item == null) return;
+            
             startIndex = lstProfiles.SelectedIndex;
             DataObject dragData = new(formatData, item);
             DragDrop.DoDragDrop(listViewItem, dragData, DragDropEffects.Copy | DragDropEffects.Move);
@@ -483,31 +422,19 @@ public partial class ProfilesView
     {
         if (e.Data.GetDataPresent(formatData) && sender == e.Source)
         {
-            // Get the drop Item destination
-            if (sender is not DataGrid listView)
-            {
-                return;
-            }
+            if (sender is not DataGrid listView) return;
 
             var listViewItem = FindAncestor<DataGridRow>((DependencyObject)e.OriginalSource);
             if (listViewItem == null)
             {
-                // Abort
                 e.Effects = DragDropEffects.None;
                 return;
             }
-            // Find the data behind the Item
             var item = (ProfileItemModel)listView.ItemContainerGenerator.ItemFromContainer(listViewItem);
-            if (item == null)
-            {
-                return;
-            }
-            // Move item into observable collection
-            // (this will be automatically reflected to lstView.ItemsSource)
+            if (item == null) return;
+            
             e.Effects = DragDropEffects.Move;
-
             ViewModel?.MoveServerTo(startIndex, item);
-
             startIndex = -1;
         }
     }

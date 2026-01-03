@@ -1,3 +1,13 @@
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
+using v2rayN.Base;
+using v2rayN.Common;
+using v2rayN.ViewModels;
+
 namespace v2rayN.Views;
 
 public partial class RoutingSettingWindow
@@ -55,12 +65,7 @@ public partial class RoutingSettingWindow
                 break;
 
             case EViewAction.RoutingRuleSettingWindow:
-
-                if (obj is null)
-                {
-                    return false;
-                }
-
+                if (obj is null) return false;
                 return new RoutingRuleSettingWindow((RoutingItem)obj).ShowDialog() ?? false;
         }
         return await Task.FromResult(true);
@@ -74,7 +79,8 @@ public partial class RoutingSettingWindow
         }
     }
 
-    private void RoutingSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void RoutingSettingWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
@@ -90,10 +96,8 @@ public partial class RoutingSettingWindow
             switch (e.Key)
             {
                 case Key.Enter:
-                    //case Key.Return:
                     ViewModel?.RoutingAdvancedSetDefault();
                     break;
-
                 case Key.Delete:
                 case Key.Back:
                     ViewModel?.RoutingAdvancedRemoveAsync();

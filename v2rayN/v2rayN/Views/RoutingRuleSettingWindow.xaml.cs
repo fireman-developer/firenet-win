@@ -1,3 +1,13 @@
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
+using v2rayN.Base;
+using v2rayN.Common;
+using v2rayN.ViewModels;
+
 namespace v2rayN.Views;
 
 public partial class RoutingRuleSettingWindow
@@ -120,7 +130,8 @@ public partial class RoutingRuleSettingWindow
         txtRemarks.Focus();
     }
 
-    private void RoutingRuleSettingWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void RoutingRuleSettingWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (!lstRules.IsKeyboardFocusWithin)
         {

@@ -1,5 +1,15 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using ReactiveUI;
+using System.Reactive.Disposables;
+using v2rayN.Base;
 using v2rayN.Manager;
+using v2rayN.ViewModels;
 
 namespace v2rayN.Views;
 
@@ -61,7 +71,8 @@ public partial class GlobalHotkeySettingWindow
         }
     }
 
-    private void TxtGlobalHotkey_PreviewKeyDown(object? sender, KeyEventArgs e)
+    // رفع ابهام KeyEventArgs
+    private void TxtGlobalHotkey_PreviewKeyDown(object? sender, System.Windows.Input.KeyEventArgs e)
     {
         e.Handled = true;
         if (sender is not TextBox txtBox)
