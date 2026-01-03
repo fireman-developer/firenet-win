@@ -44,13 +44,24 @@ jobs:
         dotnet publish ./AmazTool/AmazTool.csproj -c Release -r win-arm64 -p:SelfContained=true -p:EnableWindowsTargeting=true -p:PublishTrimmed=true -o $OutputPathArm64
         dotnet publish ./AmazTool/AmazTool.csproj -c Release -r win-x64   -p:SelfContained=true -p:EnableWindowsTargeting=true -p:PublishTrimmed=true -o $OutputPath64Sc
 
-  
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v6.0.0
+    # آپلود جداگانه بیلدها برای کاهش حجم دانلود
+    - name: Upload build artifact (x64)
+      uses: actions/upload-artifact@v4
       with:
-        name: v2rayN-windows
-        path: |
-          ${{ github.workspace }}/v2rayN/Release/windows*
+        name: v2rayN-windows-x64
+        path: ${{ env.OutputPath64 }}
+
+    - name: Upload build artifact (Arm64)
+      uses: actions/upload-artifact@v4
+      with:
+        name: v2rayN-windows-arm64
+        path: ${{ env.OutputPathArm64 }}
+
+    - name: Upload build artifact (x64 SelfContained)
+      uses: actions/upload-artifact@v4
+      with:
+        name: v2rayN-windows-x64-SelfContained
+        path: ${{ env.OutputPath64Sc }}
     
     # release zip archive
     - name: Package release zip archive
