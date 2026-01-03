@@ -1,10 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls; // این خط اضافه شد تا Grid شناخته شود
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using System.Windows.Shapes; // این خط مهم است، اما برای اطمینان در متد هم صریح می‌نویسیم
+using System.Windows.Shapes; 
 using ServiceLib.Manager;
 using ServiceLib.Models;
 
@@ -168,7 +169,6 @@ namespace v2rayN.Views
             });
         }
 
-        // رفع ابهام Path با استفاده از System.Windows.Shapes.Path
         private void DrawCircularProgress(System.Windows.Shapes.Path pathObj, double percentage, string colorHex)
         {
             if (percentage > 0.999) percentage = 0.9999;
