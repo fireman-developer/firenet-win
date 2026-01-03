@@ -6,9 +6,9 @@ on:
       release_tag:
         required: false
         type: string
-  push:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - master
 
 env:
   OutputArch: "macos-64"
