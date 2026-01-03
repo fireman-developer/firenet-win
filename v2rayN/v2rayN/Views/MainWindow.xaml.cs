@@ -3,12 +3,12 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes; // این خط مهم است، اما برای اطمینان در متد هم صریح می‌نویسیم
 using ServiceLib.Manager;
 using ServiceLib.Models;
 
-// برای استفاده از NotifyIcon ویندوز باید این فضای نام را اضافه کنیم
-// Alias تعریف می‌کنیم تا با کلاس‌های WPF تداخل نداشته باشد
+// برای استفاده از NotifyIcon ویندوز
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
@@ -28,10 +28,8 @@ namespace v2rayN.Views
             
             InitializeSystemTray();
 
-            // رویداد بارگذاری صفحه
             Loaded += MainWindow_Loaded;
             
-            // اشتراک در رویدادهای منیجر
             MidPanelManager.Instance.StatusUpdated += UpdateUI;
             MidPanelManager.Instance.NotificationsReceived += OnNotificationsReceived;
             MidPanelManager.Instance.LogoutTriggered += OnLogoutTriggered;
@@ -45,7 +43,6 @@ namespace v2rayN.Views
                 _notifyIcon.Visible = true;
                 _notifyIcon.Text = "FireNet v2ray Client";
 
-                // تلاش برای استخراج آیکون برنامه برای نمایش در تری
                 var appPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 if (!string.IsNullOrEmpty(appPath))
                 {
@@ -56,7 +53,6 @@ namespace v2rayN.Views
                     _notifyIcon.Icon = Drawing.SystemIcons.Application;
                 }
 
-                // باز کردن برنامه با کلیک روی آیکون
                 _notifyIcon.DoubleClick += (s, e) => 
                 {
                     this.Show();
@@ -66,7 +62,6 @@ namespace v2rayN.Views
             }
             catch (Exception ex)
             {
-                // اگر خطایی در ایجاد آیکون رخ داد، برنامه نباید کرش کند
                 Debug.WriteLine($"Error init tray: {ex.Message}");
             }
         }
@@ -77,9 +72,8 @@ namespace v2rayN.Views
 
             foreach (var note in response.Notifications)
             {
-                // نمایش نوتیفیکیشن ویندوز
                 _notifyIcon.ShowBalloonTip(
-                    5000, // زمان نمایش به میلی‌ثانیه
+                    5000, 
                     note.Title ?? "Notification", 
                     note.Body ?? "", 
                     WinForms.ToolTipIcon.Info
@@ -114,7 +108,6 @@ namespace v2rayN.Views
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            // بستن کامل برنامه و پاکسازی آیکون تری
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
@@ -175,7 +168,8 @@ namespace v2rayN.Views
             });
         }
 
-        private void DrawCircularProgress(Path pathObj, double percentage, string colorHex)
+        // رفع ابهام Path با استفاده از System.Windows.Shapes.Path
+        private void DrawCircularProgress(System.Windows.Shapes.Path pathObj, double percentage, string colorHex)
         {
             if (percentage > 0.999) percentage = 0.9999;
 
@@ -266,13 +260,12 @@ namespace v2rayN.Views
                 txtConnectionState.Text = "DISCONNECTED";
                 txtConnectionState.Foreground = Brushes.White;
                 btnConnect.Opacity = 0.8;
-                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(82, 85, 202); // #5255ca
+                ((DropShadowEffect)((Ellipse)((Grid)btnConnect.Template.FindName("outerRing", btnConnect)).Effect)).Color = Color.FromRgb(82, 85, 202); 
             }
         }
 
         private async void BtnLogout_Click(object sender, RoutedEventArgs e)
         {
-            // حذف آیکون تری قبل از خروج
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
