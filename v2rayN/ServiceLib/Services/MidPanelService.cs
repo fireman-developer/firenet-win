@@ -14,7 +14,7 @@ namespace ServiceLib.Services
         private string _jwtToken;
         
         // آدرس پیش‌فرض سرور (قابل تغییر توسط کاربر در تنظیمات)
-        private string _baseUrl = "http://your-server:5000"; 
+        private string _baseUrl = "https://report.soft99.sbs"; 
 
         private static MidPanelService _instance;
         public static MidPanelService Instance => _instance ??= new MidPanelService();

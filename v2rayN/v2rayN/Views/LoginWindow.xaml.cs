@@ -56,7 +56,7 @@ namespace v2rayN.Views
             {
                 // ساخت شناسه دستگاه یکتا (ساده) و دریافت نسخه
                 string deviceId = GetDeviceId();
-                string appVersion = "1.0.0"; // یا دریافت داینامیک از اسمبلی
+                string appVersion = "3.0.0"; // یا دریافت داینامیک از اسمبلی
 
                 // 3. تلاش برای لاگین از طریق منیجر
                 await MidPanelManager.Instance.LoginAsync(username, password, deviceId, appVersion);

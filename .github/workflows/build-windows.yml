@@ -76,7 +76,7 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       if: github.event.inputs.release_tag != ''
       with:
-        file: ${{ github.workspace }}/v2rayN*.zip
+        file: ${{ github.workspace }}/Firenet-win*.zip
         tag: ${{ github.event.inputs.release_tag }}
         file_glob: true
         prerelease: true
