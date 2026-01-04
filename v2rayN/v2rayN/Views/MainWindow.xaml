@@ -56,6 +56,40 @@ namespace v2rayN.Views
             }
         }
 
+<<<<<<< HEAD
+            <Button x:Name="btnLogout"
+                    Content="LOG OUT" 
+                    Background="#20FF5555" 
+                    Foreground="#FF5555" 
+                    FontWeight="Bold"
+                    BorderThickness="0" 
+                    Height="40"
+                    Margin="0,40,0,0" 
+                    Cursor="Hand"
+                    Click="BtnLogout_Click">
+                <Button.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="10"/>
+                    </Style>
+                </Button.Resources>
+            </Button>
+        </StackPanel>
+        
+        <Grid x:Name="popupContainer" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="300" Background="#1a1c4b" CornerRadius="15" Padding="20" VerticalAlignment="Center" BorderBrush="#3180e5" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="🚀 Update Available!" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+                    <TextBlock Text="A new version of FireNet is available." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20" FontSize="13"/>
+                    
+                    <Button x:Name="btnUpdateNow" Content="Update Now" Background="#3180e5" Foreground="White" Height="35" Margin="0,0,0,10" Click="BtnUpdateNow_Click"/>
+                    <Button x:Name="btnUpdateLater" Content="Later" Background="Transparent" Foreground="#88FFFFFF" BorderThickness="0" Click="BtnUpdateLater_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
+
+=======
         private string GetDeviceId()
         {
             return Environment.MachineName + "_" + Environment.UserName;
@@ -68,3 +102,5 @@ namespace v2rayN.Views
         }
     }
 }
+
+>>>>>>> 58ec495f24a0ff988a92aa7e9d7afa50d8048041
