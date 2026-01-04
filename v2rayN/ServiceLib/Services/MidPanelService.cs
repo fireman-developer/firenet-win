@@ -15,7 +15,7 @@ namespace ServiceLib.Services
         private string _jwtToken;
         
         // آدرس سرور خود را اینجا وارد کنید
-        private string _baseUrl = "https://report.soft99.sbs"; 
+        private string _baseUrl = "https://sub.your-domain.com"; 
 
         private static MidPanelService _instance;
         public static MidPanelService Instance => _instance ??= new MidPanelService();
@@ -50,8 +50,8 @@ namespace ServiceLib.Services
             }
         }
 
-        // --- سیستم لاگ‌گیری اختصاصی ---
-        private void Log(string title, string content, bool isError = false)
+        // --- سیستم لاگ‌گیری ---
+        public void Log(string title, string content, bool isError = false)
         {
             try
             {
@@ -66,7 +66,7 @@ namespace ServiceLib.Services
                 
                 File.AppendAllText(logFile, logContent);
             }
-            catch (Exception) { /* نادیده گرفتن خطای لاگ */ }
+            catch (Exception) { /* نادیده گرفتن خطا در لاگ */ }
         }
 
         public async Task<LoginResponse> LoginAsync(string username, string password, string deviceId, string appVersion)
@@ -139,7 +139,6 @@ namespace ServiceLib.Services
         {
             var url = $"{_baseUrl}/api/keepalive";
             SetupHeaders();
-            // Log("KEEPALIVE", "Sending keepalive..."); // لاگ زیاد تولید نکند
 
             try
             {
@@ -172,7 +171,6 @@ namespace ServiceLib.Services
                 if (!response.IsSuccessStatusCode) return null;
 
                 var respString = await response.Content.ReadAsStringAsync();
-                // فقط اگر نوتیفیکیشن وجود داشت لاگ کن
                 if (respString.Contains("\"notifications\":[{\"")) 
                 {
                     Log("NOTIFICATION RECEIVED", respString);
