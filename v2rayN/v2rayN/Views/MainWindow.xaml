@@ -4,12 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="FireNet Dashboard" Height="600" Width="400"
+        Title="FireNet Dashboard" Height="650" Width="420"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
-        ResizeMode="CanMinimize">
+        ResizeMode="CanResize"
+        WindowStyle="SingleBorderWindow"
+        Background="#1a1c4b">
 
     <Window.Resources>
         <Style x:Key="ConnectButtonStyle" TargetType="Button">
@@ -23,7 +22,6 @@
                                     <DropShadowEffect Color="#5255ca" BlurRadius="20" ShadowDepth="0"/>
                                 </Ellipse.Effect>
                             </Ellipse>
-                            
                             <Ellipse x:Name="circle" Width="120" Height="120">
                                 <Ellipse.Fill>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -53,28 +51,6 @@
                                 <Setter TargetName="circle" Property="Width" Value="115"/>
                                 <Setter TargetName="circle" Property="Height" Value="115"/>
                             </Trigger>
-                            </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="HeaderButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#AAFFFFFF"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -82,126 +58,106 @@
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="20" MouseLeftButtonDown="Border_MouseLeftButtonDown">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#1a1c4b" Offset="0"/>
-                <GradientStop Color="#0f2645" Offset="1"/>
-            </LinearGradientBrush>
-        </Border.Background>
-
-        <Grid>
-            <Border CornerRadius="20" Background="#05FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1"/>
-
-            <StackPanel Margin="20">
-                <Grid Margin="0,0,0,30">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                        <Image Source="../Resources/v2rayN.ico" Width="20" Height="20" Margin="0,0,10,0"/>
-                        <TextBlock Text="FireNet" Foreground="White" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                         <Button Content="−" Style="{StaticResource HeaderButtonStyle}" Click="BtnMinimize_Click" Margin="0,0,15,0" FontSize="20"/>
-                         <Button Content="✕" Style="{StaticResource HeaderButtonStyle}" Click="BtnClose_Click"/>
-                    </StackPanel>
-                </Grid>
-
-                <Border Background="#15FFFFFF" CornerRadius="15" Padding="20" Margin="0,0,0,30">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Welcome," Foreground="#88FFFFFF" FontSize="12"/>
-                            <TextBlock x:Name="txtUsername" Text="User" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,5,0,5"/>
-                            <Border x:Name="borderStatus" Background="#203180e5" CornerRadius="5" HorizontalAlignment="Left" Padding="8,2">
-                                <TextBlock x:Name="txtStatus" Text="Checking..." Foreground="#3180e5" FontSize="11"/>
-                            </Border>
-                        </StackPanel>
-
-                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="20" Background="#3180e5" VerticalAlignment="Top">
-                            <TextBlock Text="👤" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/>
-                        </Border>
-                    </Grid>
-                </Border>
-
-                <Viewbox Height="160" Margin="0,0,0,30">
-                    <Button x:Name="btnConnect" Style="{StaticResource ConnectButtonStyle}" Click="BtnConnect_Click"/>
-                </Viewbox>
-                <TextBlock x:Name="txtConnectionState" Text="Disconnected" Foreground="#88FFFFFF" HorizontalAlignment="Center" Margin="0,-20,0,30"/>
-
+    <Grid>
+        <Border Background="#1a1c4b"/>
+        
+        <StackPanel Margin="20">
+            <Border Background="#15FFFFFF" CornerRadius="15" Padding="20" Margin="0,10,0,30">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="15"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Welcome," Foreground="#88FFFFFF" FontSize="12"/>
+                        <TextBlock x:Name="txtUsername" Text="User" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,5,0,5"/>
+                        <Border x:Name="borderStatus" Background="#203180e5" CornerRadius="5" HorizontalAlignment="Left" Padding="8,2">
+                            <TextBlock x:Name="txtStatus" Text="Checking..." Foreground="#3180e5" FontSize="11"/>
+                        </Border>
+                    </StackPanel>
 
-                    <Border Grid.Column="0" Background="#10FFFFFF" CornerRadius="15" Padding="15">
-                        <StackPanel>
-                            <TextBlock Text="Data Usage" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center"/>
-                            <Grid Margin="0,15,0,10" HorizontalAlignment="Center">
-                                <Ellipse Width="80" Height="80" Stroke="#20FFFFFF" StrokeThickness="6"/>
-                                <Path x:Name="pathUsageArc" Stroke="#3180e5" StrokeThickness="6" StrokeEndLineCap="Round"
-                                      Width="80" Height="80" Stretch="None"/>
-                                
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <TextBlock x:Name="txtRemainingData" Text="0 GB" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Left" Foreground="#60FFFFFF" FontSize="10" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock x:Name="txtTotalData" Text="Total: 0 GB" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2" Background="#10FFFFFF" CornerRadius="15" Padding="15">
-                        <StackPanel>
-                            <TextBlock Text="Days Left" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center"/>
-                            <Grid Margin="0,15,0,10" HorizontalAlignment="Center">
-                                <Ellipse Width="80" Height="80" Stroke="#20FFFFFF" StrokeThickness="6"/>
-                                <Path x:Name="pathDaysArc" Stroke="#5255ca" StrokeThickness="6" StrokeEndLineCap="Round"
-                                      Width="80" Height="80" Stretch="None"/>
-                                
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <TextBlock x:Name="txtRemainingDays" Text="0" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Days" Foreground="#60FFFFFF" FontSize="10" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock x:Name="txtExpireDate" Text="Expire: -" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center"/>
-                        </StackPanel>
+                    <Border Grid.Column="1" Width="40" Height="40" CornerRadius="20" Background="#3180e5" VerticalAlignment="Top">
+                        <TextBlock Text="👤" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/>
                     </Border>
                 </Grid>
+            </Border>
 
-                <Button Content="Log Out" 
-                        Background="Transparent" 
-                        Foreground="#FF5555" 
-                        BorderThickness="0" 
-                        Margin="0,30,0,0" 
-                        Cursor="Hand"
-                        Click="BtnLogout_Click"/>
-            </StackPanel>
-            
-            <Grid x:Name="popupContainer" Visibility="Collapsed" Background="#80000000">
-                <Border Width="300" Background="#1a1c4b" CornerRadius="15" Padding="20" VerticalAlignment="Center">
+            <Viewbox Height="160" Margin="0,0,0,30">
+                <Button x:Name="btnConnect" Style="{StaticResource ConnectButtonStyle}" Click="BtnConnect_Click"/>
+            </Viewbox>
+            <TextBlock x:Name="txtConnectionState" Text="Disconnected" Foreground="#88FFFFFF" HorizontalAlignment="Center" Margin="0,-20,0,30"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="15"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="#10FFFFFF" CornerRadius="15" Padding="15">
                     <StackPanel>
-                        <TextBlock Text="🚀 Update Available!" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
-                        <TextBlock Text="A new version of FireNet is available. Please update to continue using the best features." 
-                                   Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20" FontSize="13"/>
-                        
-                        <Button x:Name="btnUpdateNow" Content="Update Now" Background="#3180e5" Foreground="White" Height="35" Margin="0,0,0,10" Click="BtnUpdateNow_Click">
-                            <Button.Resources>
-                                <Style TargetType="Border">
-                                    <Setter Property="CornerRadius" Value="8"/>
-                                </Style>
-                            </Button.Resources>
-                        </Button>
-                        
-                        <Button x:Name="btnUpdateLater" Content="Remind me later" Background="Transparent" Foreground="#88FFFFFF" BorderThickness="0" Click="BtnUpdateLater_Click"/>
+                        <TextBlock Text="Data Usage" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center"/>
+                        <Grid Margin="0,15,0,10" HorizontalAlignment="Center">
+                            <Ellipse Width="80" Height="80" Stroke="#20FFFFFF" StrokeThickness="6"/>
+                            <Path x:Name="pathUsageArc" Stroke="#3180e5" StrokeThickness="6" StrokeEndLineCap="Round"
+                                  Width="80" Height="80" Stretch="None"/>
+                            
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock x:Name="txtRemainingData" Text="0 GB" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Left" Foreground="#60FFFFFF" FontSize="10" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="txtTotalData" Text="Total: 0 GB" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Background="#10FFFFFF" CornerRadius="15" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="Days Left" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center"/>
+                        <Grid Margin="0,15,0,10" HorizontalAlignment="Center">
+                            <Ellipse Width="80" Height="80" Stroke="#20FFFFFF" StrokeThickness="6"/>
+                            <Path x:Name="pathDaysArc" Stroke="#5255ca" StrokeThickness="6" StrokeEndLineCap="Round"
+                                  Width="80" Height="80" Stretch="None"/>
+                            
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock x:Name="txtRemainingDays" Text="0" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Days" Foreground="#60FFFFFF" FontSize="10" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="txtExpireDate" Text="Expire: -" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <Button x:Name="btnLogout"
+                    Content="LOG OUT" 
+                    Background="#20FF5555" 
+                    Foreground="#FF5555" 
+                    FontWeight="Bold"
+                    BorderThickness="0" 
+                    Height="40"
+                    Margin="0,40,0,0" 
+                    Cursor="Hand"
+                    Click="BtnLogout_Click">
+                <Button.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="10"/>
+                    </Style>
+                </Button.Resources>
+            </Button>
+        </StackPanel>
+        
+        <Grid x:Name="popupContainer" Visibility="Collapsed" Background="#CC000000">
+            <Border Width="300" Background="#1a1c4b" CornerRadius="15" Padding="20" VerticalAlignment="Center" BorderBrush="#3180e5" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="🚀 Update Available!" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+                    <TextBlock Text="A new version of FireNet is available." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20" FontSize="13"/>
+                    
+                    <Button x:Name="btnUpdateNow" Content="Update Now" Background="#3180e5" Foreground="White" Height="35" Margin="0,0,0,10" Click="BtnUpdateNow_Click"/>
+                    <Button x:Name="btnUpdateLater" Content="Later" Background="Transparent" Foreground="#88FFFFFF" BorderThickness="0" Click="BtnUpdateLater_Click"/>
+                </StackPanel>
+            </Border>
         </Grid>
-    </Border>
+    </Grid>
 </Window>

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -13,8 +14,8 @@ namespace ServiceLib.Services
         private readonly HttpClient _httpClient;
         private string _jwtToken;
         
-        // آدرس پیش‌فرض سرور (قابل تغییر توسط کاربر در تنظیمات)
-        private string _baseUrl = "https://report.soft99.sbs"; 
+        // آدرس سرور خود را اینجا وارد کنید
+        private string _baseUrl = "https://sub.your-domain.com"; 
 
         private static MidPanelService _instance;
         public static MidPanelService Instance => _instance ??= new MidPanelService();
@@ -22,13 +23,9 @@ namespace ServiceLib.Services
         public MidPanelService()
         {
             _httpClient = new HttpClient();
-            // تایم‌اوت ۱۰ ثانیه برای جلوگیری از هنگ کردن برنامه
-            _httpClient.Timeout = TimeSpan.FromSeconds(10); 
+            _httpClient.Timeout = TimeSpan.FromSeconds(20); 
         }
 
-        /// <summary>
-        /// تنظیم آدرس سرور
-        /// </summary>
         public void SetBaseUrl(string url)
         {
             if (!string.IsNullOrEmpty(url))
@@ -37,9 +34,6 @@ namespace ServiceLib.Services
             }
         }
 
-        /// <summary>
-        /// تنظیم دستی توکن (مثلاً هنگام لود شدن برنامه از تنظیمات ذخیره شده)
-        /// </summary>
         public void SetToken(string token)
         {
             _jwtToken = token;
@@ -47,9 +41,6 @@ namespace ServiceLib.Services
 
         public string GetToken() => _jwtToken;
 
-        /// <summary>
-        /// افزودن توکن به هدر درخواست‌ها
-        /// </summary>
         private void SetupHeaders()
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -59,12 +50,28 @@ namespace ServiceLib.Services
             }
         }
 
-        /// <summary>
-        /// لاگین کاربر
-        /// Endpoint: POST /api/login
-        /// </summary>
+        // --- سیستم لاگ‌گیری اختصاصی ---
+        private void Log(string title, string content, bool isError = false)
+        {
+            try
+            {
+                string logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "api_logs");
+                if (!Directory.Exists(logDir))
+                {
+                    Directory.CreateDirectory(logDir);
+                }
+
+                string logFile = Path.Combine(logDir, $"log_{DateTime.Now:yyyy-MM-dd}.txt");
+                string logContent = $"[{DateTime.Now:HH:mm:ss}] [{title.ToUpper()}] {(isError ? "[ERROR]" : "")}\n{content}\n--------------------------------------------------\n";
+                
+                File.AppendAllText(logFile, logContent);
+            }
+            catch (Exception) { /* نادیده گرفتن خطای لاگ */ }
+        }
+
         public async Task<LoginResponse> LoginAsync(string username, string password, string deviceId, string appVersion)
         {
+            var url = $"{_baseUrl}/api/login";
             var requestObj = new LoginRequest
             {
                 Username = username,
@@ -76,15 +83,19 @@ namespace ServiceLib.Services
             var json = JsonSerializer.Serialize(requestObj);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            // لاگین نیاز به توکن ندارد
+            Log("LOGIN REQUEST", $"URL: {url}\nPayload: {json}");
+
             _httpClient.DefaultRequestHeaders.Clear();
 
             try 
             {
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/login", content);
+                var response = await _httpClient.PostAsync(url, content);
+                var respString = await response.Content.ReadAsStringAsync();
+                
+                Log("LOGIN RESPONSE", $"Status: {response.StatusCode}\nBody: {respString}", !response.IsSuccessStatusCode);
+
                 response.EnsureSuccessStatusCode();
 
-                var respString = await response.Content.ReadAsStringAsync();
                 var loginResp = JsonSerializer.Deserialize<LoginResponse>(respString);
 
                 if (loginResp != null && !string.IsNullOrEmpty(loginResp.Token))
@@ -96,135 +107,129 @@ namespace ServiceLib.Services
             }
             catch (Exception ex)
             {
-                // مدیریت خطا در لایه فراخوان انجام می‌شود
+                Log("LOGIN ERROR", ex.ToString(), true);
                 throw new Exception($"Login failed: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// دریافت وضعیت کاربر
-        /// Endpoint: GET /api/status
-        /// </summary>
         public async Task<StatusResponse> GetStatusAsync()
         {
+            var url = $"{_baseUrl}/api/status";
             SetupHeaders();
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/status");
-            response.EnsureSuccessStatusCode();
+            Log("STATUS REQUEST", $"URL: {url}\nToken: {_jwtToken}");
 
-            var respString = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<StatusResponse>(respString);
+            try
+            {
+                var response = await _httpClient.GetAsync(url);
+                var respString = await response.Content.ReadAsStringAsync();
+
+                Log("STATUS RESPONSE", $"Status: {response.StatusCode}\nBody: {respString}", !response.IsSuccessStatusCode);
+
+                response.EnsureSuccessStatusCode();
+                return JsonSerializer.Deserialize<StatusResponse>(respString);
+            }
+            catch (Exception ex)
+            {
+                Log("STATUS ERROR", ex.ToString(), true);
+                throw;
+            }
         }
 
-        /// <summary>
-        /// تمدید نشست
-        /// Endpoint: POST /api/keepalive
-        /// </summary>
         public async Task<ApiResponse> KeepAliveAsync()
         {
+            var url = $"{_baseUrl}/api/keepalive";
             SetupHeaders();
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/keepalive", content);
-            
-            if (!response.IsSuccessStatusCode) return null;
+            // Log("KEEPALIVE", "Sending keepalive..."); // لاگ زیاد تولید نکند
 
-            var respString = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ApiResponse>(respString);
+            try
+            {
+                var content = new StringContent("{}", Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, content);
+                var respString = await response.Content.ReadAsStringAsync();
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    Log("KEEPALIVE ERROR", $"Status: {response.StatusCode}\nBody: {respString}", true);
+                }
+
+                return JsonSerializer.Deserialize<ApiResponse>(respString);
+            }
+            catch (Exception ex)
+            {
+                Log("KEEPALIVE EXCEPTION", ex.ToString(), true);
+                throw;
+            }
         }
 
-        /// <summary>
-        /// آپدیت توکن نوتیفیکیشن
-        /// Endpoint: POST /api/update-fcm-token
-        /// </summary>
-        public async Task<ApiResponse> UpdateFcmTokenAsync(string fcmToken)
-        {
-            SetupHeaders();
-            var req = new FcmTokenRequest { FcmToken = fcmToken };
-            var json = JsonSerializer.Serialize(req);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/update-fcm-token", content);
-            response.EnsureSuccessStatusCode();
-
-            var respString = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ApiResponse>(respString);
-        }
-
-        /// <summary>
-        /// دریافت نوتیفیکیشن‌های جدید (Polling)
-        /// Endpoint: GET /api/notifications/fetch
-        /// </summary>
         public async Task<NotificationFetchResponse> FetchNotificationsAsync()
         {
+            var url = $"{_baseUrl}/api/notifications/fetch";
             SetupHeaders();
+
             try 
             {
-                var response = await _httpClient.GetAsync($"{_baseUrl}/api/notifications/fetch");
+                var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var respString = await response.Content.ReadAsStringAsync();
+                // فقط اگر نوتیفیکیشن وجود داشت لاگ کن
+                if (respString.Contains("\"notifications\":[{\"")) 
+                {
+                    Log("NOTIFICATION RECEIVED", respString);
+                }
+                
                 return JsonSerializer.Deserialize<NotificationFetchResponse>(respString);
             }
-            catch
+            catch (Exception ex)
             {
-                return null; // خطا در دریافت نوتیفیکیشن نباید برنامه را متوقف کند
+                Log("NOTIFICATION ERROR", ex.Message, true);
+                return null;
             }
         }
 
-        /// <summary>
-        /// گزارش مشاهده پاپ‌آپ آپدیت
-        /// Endpoint: POST /api/update-prompt-seen
-        /// </summary>
         public async Task<ApiResponse> UpdatePromptSeenAsync()
         {
+            var url = $"{_baseUrl}/api/update-prompt-seen";
             SetupHeaders();
             var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/update-prompt-seen", content);
-            response.EnsureSuccessStatusCode();
-
+            var response = await _httpClient.PostAsync(url, content);
             var respString = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ApiResponse>(respString);
         }
 
-        /// <summary>
-        /// گزارش آپدیت موفقیت‌آمیز
-        /// Endpoint: POST /api/report-update
-        /// </summary>
         public async Task<ApiResponse> ReportUpdateAsync(string newVersion)
         {
+            var url = $"{_baseUrl}/api/report-update";
             SetupHeaders();
             var req = new ReportUpdateRequest { NewVersion = newVersion };
             var json = JsonSerializer.Serialize(req);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/report-update", content);
-            response.EnsureSuccessStatusCode();
-
+            var response = await _httpClient.PostAsync(url, content);
             var respString = await response.Content.ReadAsStringAsync();
+            Log("REPORT UPDATE", $"Ver: {newVersion}\nResponse: {respString}");
             return JsonSerializer.Deserialize<ApiResponse>(respString);
         }
 
-        /// <summary>
-        /// خروج از حساب
-        /// Endpoint: POST /api/logout
-        /// </summary>
         public async Task<ApiResponse> LogoutAsync()
         {
+            var url = $"{_baseUrl}/api/logout";
             SetupHeaders();
             var content = new StringContent("{}", Encoding.UTF8, "application/json");
             
             try 
             {
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/logout", content);
-                // چه موفق باشد چه نباشد، توکن سمت کلاینت باید پاک شود
+                Log("LOGOUT REQUEST", "User logging out");
+                var response = await _httpClient.PostAsync(url, content);
                 _jwtToken = null; 
 
-                if (!response.IsSuccessStatusCode) return null;
-
                 var respString = await response.Content.ReadAsStringAsync();
+                Log("LOGOUT RESPONSE", respString);
                 return JsonSerializer.Deserialize<ApiResponse>(respString);
             }
-            catch
+            catch (Exception ex)
             {
+                Log("LOGOUT ERROR", ex.Message, true);
                 _jwtToken = null;
                 return new ApiResponse { Message = "Logged out locally" };
             }

@@ -48,19 +48,19 @@ jobs:
     - name: Upload build artifact (x64)
       uses: actions/upload-artifact@v4
       with:
-        name: v2rayN-windows-x64
+        name: Firenet-windows-x64
         path: ${{ env.OutputPath64 }}
 
     - name: Upload build artifact (Arm64)
       uses: actions/upload-artifact@v4
       with:
-        name: v2rayN-windows-arm64
+        name: Firenet-windows-arm64
         path: ${{ env.OutputPathArm64 }}
 
     - name: Upload build artifact (x64 SelfContained)
       uses: actions/upload-artifact@v4
       with:
-        name: v2rayN-windows-x64-SelfContained
+        name: Firenet-windows-x64-SelfContained
         path: ${{ env.OutputPath64Sc }}
     
     # release zip archive

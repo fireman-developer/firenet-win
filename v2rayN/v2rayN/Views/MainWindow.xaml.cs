@@ -15,9 +15,6 @@ using Drawing = System.Drawing;
 
 namespace v2rayN.Views
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         private bool _isConnected = false;
@@ -26,7 +23,6 @@ namespace v2rayN.Views
         public MainWindow()
         {
             InitializeComponent();
-            
             InitializeSystemTray();
 
             Loaded += MainWindow_Loaded;
@@ -92,29 +88,6 @@ namespace v2rayN.Views
             {
                  _ = MidPanelManager.Instance.RefreshStatus();
             }
-        }
-
-        private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ButtonState == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
-        }
-
-        private void BtnMinimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
-
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Dispose();
-            }
-            Application.Current.Shutdown();
         }
 
         private void UpdateUI(StatusResponse status)
@@ -232,7 +205,7 @@ namespace v2rayN.Views
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "https://your-server.com/download-latest", 
+                    FileName = "https://sub.your-domain.com/download-latest", // لینک دانلود را تنظیم کنید
                     UseShellExecute = true
                 });
             }
@@ -248,7 +221,6 @@ namespace v2rayN.Views
         {
             _isConnected = !_isConnected;
 
-            // اصلاح ارور کستینگ: دریافت دقیق المنت‌ها از تمپلت دکمه
             var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
             var dropShadow = outerRing?.Effect as DropShadowEffect;
 
