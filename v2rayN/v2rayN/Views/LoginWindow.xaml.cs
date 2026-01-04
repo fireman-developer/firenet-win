@@ -9,9 +9,10 @@ using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using ServiceLib.Manager;
 using ServiceLib.Models;
-using ServiceLib.Handler; // برای دسترسی به کانفیگ
-using ServiceLib.Services; // برای لاگ
+using ServiceLib.Handler;
+using ServiceLib.Services;
 
+// برای استفاده از NotifyIcon ویندوز و رفع ابهام
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
@@ -92,12 +93,10 @@ namespace v2rayN.Views
             }
         }
 
-        // دکمه تنظیمات - باز کردن پنجره OptionSettingWindow
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // ایجاد و نمایش پنجره تنظیمات اصلی v2rayN
                 var settingsWindow = new OptionSettingWindow();
                 settingsWindow.ShowDialog();
             }
@@ -121,13 +120,11 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
-                // === لاجیک محاسبه حجم (با پشتیبانی از نال) ===
                 if (status.DataLimit == null || status.DataLimit == 0)
                 {
-                    // حالت نامحدود
                     txtTotalData.Text = "Unlimited Data";
                     txtRemainingData.Text = "∞";
-                    DrawCircularProgress(pathUsageArc, 1.0, "#3180e5"); // دایره کامل
+                    DrawCircularProgress(pathUsageArc, 1.0, "#3180e5");
                 }
                 else
                 {
@@ -149,10 +146,8 @@ namespace v2rayN.Views
                     DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
                 }
 
-                // === لاجیک محاسبه زمان (با پشتیبانی از نال) ===
                 if (status.Expire == null || status.Expire == 0)
                 {
-                    // حالت زمان نامحدود
                     txtRemainingDays.Text = "∞";
                     txtExpireDate.Text = "No Expiry";
                     DrawCircularProgress(pathDaysArc, 1.0, "#5255ca");
@@ -168,7 +163,6 @@ namespace v2rayN.Views
 
                     txtRemainingDays.Text = daysLeft.ToString();
 
-                    // فرض سقف 30 روز برای گرافیک
                     double daysPercent = (daysLeft > 30) ? 1.0 : (double)daysLeft / 30.0;
                     DrawCircularProgress(pathDaysArc, daysPercent, "#5255ca");
                 }
@@ -182,7 +176,7 @@ namespace v2rayN.Views
             if (percentage > 0.999) percentage = 0.9999;
 
             double angle = percentage * 360;
-            double radius = 40; // شعاع باید نصف Width (80) باشد
+            double radius = 40;
             double startAngle = -90;
             double endAngle = startAngle + angle;
 
@@ -252,10 +246,8 @@ namespace v2rayN.Views
             popupContainer.Visibility = Visibility.Collapsed;
         }
 
-        // دکمه اتصال واقعی همراه با لاگ
         private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
-            // جلوگیری از کلیک‌های پشت سر هم
             btnConnect.IsEnabled = false;
             
             try 
@@ -267,10 +259,8 @@ namespace v2rayN.Views
 
                 if (_isConnected)
                 {
-                    // === روشن کردن وی‌پی‌ان ===
                     MidPanelService.Instance.Log("CORE START", "Fetching default server...");
                     
-                    // 1. دریافت سرور انتخاب شده (دیفالت)
                     var config = AppManager.Instance.Config;
                     var node = await ConfigHandler.GetDefaultServer(config);
                     
@@ -284,15 +274,11 @@ namespace v2rayN.Views
                     }
 
                     MidPanelService.Instance.Log("CORE START", $"Starting core with server: {node.Remarks}");
-                    
-                    // 2. استارت هسته
                     await CoreManager.Instance.LoadCore(node);
-                    
                     MidPanelService.Instance.Log("CORE STARTED", "Core loaded successfully.");
                 }
                 else
                 {
-                    // === خاموش کردن وی‌پی‌ان ===
                     MidPanelService.Instance.Log("CORE STOP", "Stopping core...");
                     await CoreManager.Instance.CoreStop();
                     MidPanelService.Instance.Log("CORE STOPPED", "Core stopped successfully.");
@@ -302,8 +288,6 @@ namespace v2rayN.Views
             {
                 MidPanelService.Instance.Log("CONNECTION EXCEPTION", ex.ToString(), true);
                 MessageBox.Show($"Connection Error: {ex.Message}");
-                
-                // در صورت خطا، دکمه را به حالت خاموش برگردان
                 _isConnected = false;
                 UpdateConnectionUI(false);
             }
