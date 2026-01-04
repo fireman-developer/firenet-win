@@ -90,11 +90,14 @@ namespace v2rayN.Views
             try
             {
                 // تلاش برای دریافت وضعیت کاربر از سرور
-                // اصلاح: چون RefreshStatus مقدار برنمی‌گرداند، ابتدا await می‌کنیم سپس مقدار را از پراپرتی می‌خوانیم
+                // ابتدا وضعیت را رفرش می‌کنیم
                 await MidPanelManager.Instance.RefreshStatus();
+                
+                // سپس وضعیت فعلی را می‌خوانیم
                 var status = MidPanelManager.Instance.CurrentStatus;
 
-                // قانون سخت‌گیرانه: اگر استاتوس نال بود (توکن نامعتبر/خطای سرور)
+                // قانون سخت‌گیرانه: اگر استاتوس نال بود (توکن نامعتبر/خطای سرور/عدم دسترسی)
+                // باید کاربر را به بیرون هدایت کنیم
                 if (status == null)
                 {
                     throw new Exception("Security Check Failed: Token invalid or server unreachable.");
@@ -118,13 +121,13 @@ namespace v2rayN.Views
                 // 1. پاک کردن تمام کانفیگ‌ها (سرورها) از برنامه
                 if (AppManager.Instance.Config != null)
                 {
-                    // اصلاح: Outbound وجود ندارد، نام صحیح ProfileItems است
                     if (AppManager.Instance.Config.ProfileItems != null)
                     {
                         AppManager.Instance.Config.ProfileItems.Clear();
                     }
                     
-                    // اصلاح: متد SaveConfig در ConfigHandler است
+                    // ذخیره تغییرات (کانفیگ خالی شده)
+                    // ConfigHandler مسئول ذخیره فایل کانفیگ است
                     await ConfigHandler.SaveConfig(AppManager.Instance.Config);
                 }
 
@@ -322,6 +325,7 @@ namespace v2rayN.Views
             try 
             {
                 _isConnected = !_isConnected;
+                // آپدیت UI قبل از عملیات سنگین اتصال
                 UpdateConnectionUI(_isConnected);
 
                 MidPanelService.Instance.Log("CONNECTION CLICK", $"User clicked connect. Target State: {(_isConnected ? "ON" : "OFF")}");
@@ -357,6 +361,8 @@ namespace v2rayN.Views
             {
                 MidPanelService.Instance.Log("CONNECTION EXCEPTION", ex.ToString(), true);
                 MessageBox.Show($"Connection Error: {ex.Message}");
+                
+                // در صورت خطا، دکمه را به حالت قطع برگردان
                 _isConnected = false;
                 UpdateConnectionUI(false);
             }
@@ -366,26 +372,37 @@ namespace v2rayN.Views
             }
         }
 
+        // رفع ارور read-only state: به جای تغییر پراپرتی افکت قبلی، یک افکت جدید می‌سازیم
         private void UpdateConnectionUI(bool connected)
         {
             var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
-            var dropShadow = outerRing?.Effect as DropShadowEffect;
+            
+            if (outerRing != null)
+            {
+                // ایجاد یک DropShadowEffect جدید به جای ویرایش قبلی
+                var newShadow = new DropShadowEffect
+                {
+                    BlurRadius = 25,
+                    ShadowDepth = 0,
+                    // رنگ آبی برای اتصال، رنگ بنفش تیره برای قطع
+                    Color = connected ? Color.FromRgb(49, 128, 229) : Color.FromRgb(82, 85, 202),
+                    Opacity = 1.0 // پیش فرض
+                };
+                
+                outerRing.Effect = newShadow;
+            }
 
             if (connected)
             {
                 txtConnectionState.Text = "CONNECTED";
                 txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
                 btnConnect.Opacity = 1.0;
-                
-                if (dropShadow != null) dropShadow.Color = Color.FromRgb(49, 128, 229);
             }
             else
             {
                 txtConnectionState.Text = "DISCONNECTED";
                 txtConnectionState.Foreground = Brushes.White;
                 btnConnect.Opacity = 0.8;
-                
-                if (dropShadow != null) dropShadow.Color = Color.FromRgb(82, 85, 202); 
             }
         }
 

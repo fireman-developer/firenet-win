@@ -11,21 +11,19 @@ using ServiceLib.Manager;
 using ServiceLib.Models;
 using ServiceLib.Handler;
 using ServiceLib.Services;
+using System.Collections.Generic;
 
-// برای استفاده از NotifyIcon ویندوز و رفع ابهام
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
 namespace v2rayN.Views
 {
-    // نام کلاس را به LoginWindow تغییر دادم تا با نام فایل یکی شود و ارور تکراری بودن کلاس رفع شود
-    // اما تمام لاجیک صفحه اصلی شما در اینجا حفظ شده است
-    public partial class LoginWindow : Window
+    public partial class MainWindow : Window
     {
         private bool _isConnected = false;
         private WinForms.NotifyIcon _notifyIcon;
 
-        public LoginWindow()
+        public MainWindow()
         {
             InitializeComponent();
             InitializeSystemTray();
@@ -83,15 +81,63 @@ namespace v2rayN.Views
             }
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (MidPanelManager.Instance.CurrentStatus != null)
+            try
             {
-                UpdateUI(MidPanelManager.Instance.CurrentStatus);
+                await MidPanelManager.Instance.RefreshStatus();
+                
+                var status = MidPanelManager.Instance.CurrentStatus;
+
+                if (status == null)
+                {
+                    throw new Exception("Security Check Failed: Token invalid or server unreachable.");
+                }
+
+                UpdateUI(status);
             }
-            else
+            catch (Exception)
             {
-                 _ = MidPanelManager.Instance.RefreshStatus();
+                await PerformFullLogout();
+            }
+        }
+
+        private async Task PerformFullLogout()
+        {
+            try
+            {
+                if (AppManager.Instance.Config != null)
+                {
+                    if (AppManager.Instance.Config.ProfileItems != null)
+                    {
+                        AppManager.Instance.Config.ProfileItems.Clear();
+                    }
+                    
+                    await ConfigHandler.SaveConfig(AppManager.Instance.Config);
+                }
+
+                await CoreManager.Instance.CoreStop();
+                _isConnected = false;
+
+                if (_notifyIcon != null)
+                {
+                    _notifyIcon.Visible = false;
+                    _notifyIcon.Dispose();
+                    _notifyIcon = null;
+                }
+
+                await MidPanelManager.Instance.LogoutAsync();
+            }
+            catch 
+            { 
+            }
+            finally
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    new LoginWindow().Show();
+                    this.Close();
+                });
             }
         }
 
@@ -122,7 +168,6 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
-                // اصلاح ارور بیلد: حذف .Value و ?? چون DataLimit از نوع long است
                 if (status.DataLimit == 0)
                 {
                     txtTotalData.Text = "Unlimited Data";
@@ -132,7 +177,7 @@ namespace v2rayN.Views
                 else
                 {
                     long limit = status.DataLimit;
-                    long used = status.UsedTraffic; // حذف ?? 0
+                    long used = status.UsedTraffic;
                     long remaining = limit - used;
                     if (remaining < 0) remaining = 0;
 
@@ -149,7 +194,6 @@ namespace v2rayN.Views
                     DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
                 }
 
-                // اصلاح ارور بیلد: حذف .Value چون Expire از نوع long است
                 if (status.Expire == 0)
                 {
                     txtRemainingDays.Text = "∞";
@@ -292,6 +336,7 @@ namespace v2rayN.Views
             {
                 MidPanelService.Instance.Log("CONNECTION EXCEPTION", ex.ToString(), true);
                 MessageBox.Show($"Connection Error: {ex.Message}");
+                
                 _isConnected = false;
                 UpdateConnectionUI(false);
             }
@@ -304,46 +349,42 @@ namespace v2rayN.Views
         private void UpdateConnectionUI(bool connected)
         {
             var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
-            var dropShadow = outerRing?.Effect as DropShadowEffect;
+            
+            if (outerRing != null)
+            {
+                var newShadow = new DropShadowEffect
+                {
+                    BlurRadius = 25,
+                    ShadowDepth = 0,
+                    Color = connected ? Color.FromRgb(49, 128, 229) : Color.FromRgb(82, 85, 202),
+                    Opacity = 1.0 
+                };
+                
+                outerRing.Effect = newShadow;
+            }
 
             if (connected)
             {
                 txtConnectionState.Text = "CONNECTED";
                 txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
                 btnConnect.Opacity = 1.0;
-                
-                if (dropShadow != null) dropShadow.Color = Color.FromRgb(49, 128, 229);
             }
             else
             {
                 txtConnectionState.Text = "DISCONNECTED";
                 txtConnectionState.Foreground = Brushes.White;
                 btnConnect.Opacity = 0.8;
-                
-                if (dropShadow != null) dropShadow.Color = Color.FromRgb(82, 85, 202); 
             }
         }
 
         private async void BtnLogout_Click(object sender, RoutedEventArgs e)
         {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Dispose();
-                _notifyIcon = null;
-            }
-            await MidPanelManager.Instance.LogoutAsync();
+            await PerformFullLogout();
         }
 
-        private void OnLogoutTriggered()
+        private async void OnLogoutTriggered()
         {
-            Dispatcher.Invoke(() =>
-            {
-                // اینجا فرض بر این است که لاگین مجدداً همین صفحه یا صفحه دیگری را باز کند
-                // اگر صفحه دیگری برای لاگین ندارید، می‌توانید همین صفحه را ریست کنید
-                new LoginWindow().Show();
-                this.Close();
-            });
+            await PerformFullLogout();
         }
     }
 }
