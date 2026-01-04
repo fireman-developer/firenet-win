@@ -118,7 +118,8 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
-                if (status.DataLimit == null || status.DataLimit == 0)
+                // اصلاح شده: حذف بررسی نال برای انواع long
+                if (status.DataLimit == 0)
                 {
                     txtTotalData.Text = "Unlimited Data";
                     txtRemainingData.Text = "∞";
@@ -126,8 +127,8 @@ namespace v2rayN.Views
                 }
                 else
                 {
-                    long limit = status.DataLimit.Value;
-                    long used = status.UsedTraffic ?? 0;
+                    long limit = status.DataLimit;
+                    long used = status.UsedTraffic;
                     long remaining = limit - used;
                     if (remaining < 0) remaining = 0;
 
@@ -144,7 +145,8 @@ namespace v2rayN.Views
                     DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
                 }
 
-                if (status.Expire == null || status.Expire == 0)
+                // اصلاح شده: حذف بررسی نال برای انواع long
+                if (status.Expire == 0)
                 {
                     txtRemainingDays.Text = "∞";
                     txtExpireDate.Text = "No Expiry";
@@ -152,7 +154,7 @@ namespace v2rayN.Views
                 }
                 else
                 {
-                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire.Value).LocalDateTime;
+                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire).LocalDateTime;
                     txtExpireDate.Text = $"Expire: {expireDate:yyyy-MM-dd}";
 
                     TimeSpan left = expireDate - DateTime.Now;
