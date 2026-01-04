@@ -1,238 +1,298 @@
 using System;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using ServiceLib.Models;
+using ServiceLib.Services;
+using ServiceLib.Handler; // برای دسترسی به متدهای مدیریت کانفیگ (ConfigHandler)
+using ServiceLib.Events;  // برای ارسال رویداد رفرش شدن لیست (AppEvents)
+using ServiceLib.Common;  // برای دسترسی به AppManager و تنظیمات
 
-namespace ServiceLib.Services
+namespace ServiceLib.Manager
 {
-    public class MidPanelService
+    public class MidPanelManager
     {
-        private readonly HttpClient _httpClient;
-        private string _jwtToken;
+        // سینگلتون برای دسترسی آسان در کل برنامه
+        private static MidPanelManager _instance;
+        public static MidPanelManager Instance => _instance ??= new MidPanelManager();
+
+        // استفاده صریح از System.Timers برای جلوگیری از تداخل با System.Threading
+        private System.Timers.Timer _keepAliveTimer;
+        private System.Timers.Timer _statusRefreshTimer;
+        private System.Timers.Timer _notificationTimer;
         
-        // آدرس سرور خود را اینجا وارد کنید
-        private string _baseUrl = "https://report.soft99.sbs"; 
+        // نام فایل ذخیره توکن
+        private const string TokenFileName = "session_token.dat";
+        
+        // شناسه اختصاصی برای گروه بندی سرورهای پنل در v2rayN
+        // این باعث می‌شود سرورهای پنل با سرورهای شخصی کاربر قاطی نشوند
+        private const string FireNetSubId = "FireNet_Panel"; 
+        
+        // وضعیت فعلی کاربر
+        public StatusResponse CurrentStatus { get; private set; }
 
-        private static MidPanelService _instance;
-        public static MidPanelService Instance => _instance ??= new MidPanelService();
+        // رویدادها برای آپدیت کردن UI
+        public event Action<StatusResponse> StatusUpdated;
+        public event Action<NotificationFetchResponse> NotificationsReceived;
+        public event Action LogoutTriggered;
 
-        public MidPanelService()
+        // بررسی وضعیت لاگین بودن
+        public bool IsLoggedIn => !string.IsNullOrEmpty(MidPanelService.Instance.GetToken());
+
+        public MidPanelManager()
         {
-            _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(20); 
+            InitializeTimers();
         }
 
-        public void SetBaseUrl(string url)
+        private void InitializeTimers()
         {
-            if (!string.IsNullOrEmpty(url))
+            // تایمر Keep-alive: هر 1 ساعت
+            _keepAliveTimer = new System.Timers.Timer(3600000); 
+            _keepAliveTimer.Elapsed += async (s, e) => await PerformKeepAlive();
+
+            // تایمر رفرش وضعیت: هر 5 دقیقه
+            _statusRefreshTimer = new System.Timers.Timer(300000); 
+            _statusRefreshTimer.Elapsed += async (s, e) => await RefreshStatus();
+
+            // تایمر چک کردن نوتیفیکیشن: هر 5 دقیقه
+            _notificationTimer = new System.Timers.Timer(300000); 
+            _notificationTimer.Elapsed += async (s, e) => await CheckNotifications();
+        }
+
+        /// <summary>
+        /// تلاش برای بازیابی نشست قبلی هنگام باز شدن برنامه
+        /// </summary>
+        public async Task<bool> TryRestoreSessionAsync()
+        {
+            if (File.Exists(TokenFileName))
             {
-                _baseUrl = url.TrimEnd('/');
-            }
-        }
-
-        public void SetToken(string token)
-        {
-            _jwtToken = token;
-        }
-
-        public string GetToken() => _jwtToken;
-
-        private void SetupHeaders()
-        {
-            _httpClient.DefaultRequestHeaders.Clear();
-            if (!string.IsNullOrEmpty(_jwtToken))
-            {
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
-            }
-        }
-
-        // --- سیستم لاگ‌گیری اختصاصی ---
-        private void Log(string title, string content, bool isError = false)
-        {
-            try
-            {
-                string logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "api_logs");
-                if (!Directory.Exists(logDir))
+                try 
                 {
-                    Directory.CreateDirectory(logDir);
+                    string savedToken = await File.ReadAllTextAsync(TokenFileName);
+                    if (!string.IsNullOrWhiteSpace(savedToken))
+                    {
+                        MidPanelService.Instance.SetToken(savedToken.Trim());
+                        
+                        // تست اعتبار توکن با دریافت وضعیت
+                        await RefreshStatus();
+                        
+                        // اگر خطا نداد یعنی معتبر است
+                        StartBackgroundTasks();
+                        return true;
+                    }
                 }
-
-                string logFile = Path.Combine(logDir, $"log_{DateTime.Now:yyyy-MM-dd}.txt");
-                string logContent = $"[{DateTime.Now:HH:mm:ss}] [{title.ToUpper()}] {(isError ? "[ERROR]" : "")}\n{content}\n--------------------------------------------------\n";
-                
-                File.AppendAllText(logFile, logContent);
-            }
-            catch (Exception) { /* نادیده گرفتن خطای لاگ */ }
-        }
-
-        public async Task<LoginResponse> LoginAsync(string username, string password, string deviceId, string appVersion)
-        {
-            var url = $"{_baseUrl}/api/login";
-            var requestObj = new LoginRequest
-            {
-                Username = username,
-                Password = password,
-                DeviceId = deviceId,
-                AppVersion = appVersion
-            };
-
-            var json = JsonSerializer.Serialize(requestObj);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            Log("LOGIN REQUEST", $"URL: {url}\nPayload: {json}");
-
-            _httpClient.DefaultRequestHeaders.Clear();
-
-            try 
-            {
-                var response = await _httpClient.PostAsync(url, content);
-                var respString = await response.Content.ReadAsStringAsync();
-                
-                Log("LOGIN RESPONSE", $"Status: {response.StatusCode}\nBody: {respString}", !response.IsSuccessStatusCode);
-
-                response.EnsureSuccessStatusCode();
-
-                var loginResp = JsonSerializer.Deserialize<LoginResponse>(respString);
-
-                if (loginResp != null && !string.IsNullOrEmpty(loginResp.Token))
+                catch
                 {
-                    _jwtToken = loginResp.Token;
+                    // توکن نامعتبر یا فایل خراب
+                    PerformLogoutLocal();
                 }
-
-                return loginResp;
             }
-            catch (Exception ex)
-            {
-                Log("LOGIN ERROR", ex.ToString(), true);
-                throw new Exception($"Login failed: {ex.Message}");
-            }
+            return false;
         }
 
-        public async Task<StatusResponse> GetStatusAsync()
+        /// <summary>
+        /// لاگین کاربر و شروع سرویس‌ها
+        /// </summary>
+        public async Task LoginAsync(string username, string password, string deviceId, string appVersion)
         {
-            var url = $"{_baseUrl}/api/status";
-            SetupHeaders();
-            Log("STATUS REQUEST", $"URL: {url}\nToken: {_jwtToken}");
-
-            try
-            {
-                var response = await _httpClient.GetAsync(url);
-                var respString = await response.Content.ReadAsStringAsync();
-
-                Log("STATUS RESPONSE", $"Status: {response.StatusCode}\nBody: {respString}", !response.IsSuccessStatusCode);
-
-                response.EnsureSuccessStatusCode();
-                return JsonSerializer.Deserialize<StatusResponse>(respString);
-            }
-            catch (Exception ex)
-            {
-                Log("STATUS ERROR", ex.ToString(), true);
-                throw;
-            }
-        }
-
-        public async Task<ApiResponse> KeepAliveAsync()
-        {
-            var url = $"{_baseUrl}/api/keepalive";
-            SetupHeaders();
-            // Log("KEEPALIVE", "Sending keepalive..."); // لاگ زیاد تولید نکند
-
-            try
-            {
-                var content = new StringContent("{}", Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(url, content);
-                var respString = await response.Content.ReadAsStringAsync();
-                
-                if (!response.IsSuccessStatusCode)
-                {
-                    Log("KEEPALIVE ERROR", $"Status: {response.StatusCode}\nBody: {respString}", true);
-                }
-
-                return JsonSerializer.Deserialize<ApiResponse>(respString);
-            }
-            catch (Exception ex)
-            {
-                Log("KEEPALIVE EXCEPTION", ex.ToString(), true);
-                throw;
-            }
-        }
-
-        public async Task<NotificationFetchResponse> FetchNotificationsAsync()
-        {
-            var url = $"{_baseUrl}/api/notifications/fetch";
-            SetupHeaders();
-
-            try 
-            {
-                var response = await _httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode) return null;
-
-                var respString = await response.Content.ReadAsStringAsync();
-                // فقط اگر نوتیفیکیشن وجود داشت لاگ کن
-                if (respString.Contains("\"notifications\":[{\"")) 
-                {
-                    Log("NOTIFICATION RECEIVED", respString);
-                }
-                
-                return JsonSerializer.Deserialize<NotificationFetchResponse>(respString);
-            }
-            catch (Exception ex)
-            {
-                Log("NOTIFICATION ERROR", ex.Message, true);
-                return null;
-            }
-        }
-
-        public async Task<ApiResponse> UpdatePromptSeenAsync()
-        {
-            var url = $"{_baseUrl}/api/update-prompt-seen";
-            SetupHeaders();
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(url, content);
-            var respString = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ApiResponse>(respString);
-        }
-
-        public async Task<ApiResponse> ReportUpdateAsync(string newVersion)
-        {
-            var url = $"{_baseUrl}/api/report-update";
-            SetupHeaders();
-            var req = new ReportUpdateRequest { NewVersion = newVersion };
-            var json = JsonSerializer.Serialize(req);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync(url, content);
-            var respString = await response.Content.ReadAsStringAsync();
-            Log("REPORT UPDATE", $"Ver: {newVersion}\nResponse: {respString}");
-            return JsonSerializer.Deserialize<ApiResponse>(respString);
-        }
-
-        public async Task<ApiResponse> LogoutAsync()
-        {
-            var url = $"{_baseUrl}/api/logout";
-            SetupHeaders();
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var result = await MidPanelService.Instance.LoginAsync(username, password, deviceId, appVersion);
             
-            try 
+            if (result != null && !string.IsNullOrEmpty(result.Token))
             {
-                Log("LOGOUT REQUEST", "User logging out");
-                var response = await _httpClient.PostAsync(url, content);
-                _jwtToken = null; 
+                // ذخیره توکن
+                await File.WriteAllTextAsync(TokenFileName, result.Token);
+                
+                // دریافت اطلاعات اولیه و کانفیگ‌ها
+                await RefreshStatus();
+                
+                // شروع تایمرها
+                StartBackgroundTasks();
+            }
+        }
 
-                var respString = await response.Content.ReadAsStringAsync();
-                Log("LOGOUT RESPONSE", respString);
-                return JsonSerializer.Deserialize<ApiResponse>(respString);
+        /// <summary>
+        /// خروج کامل (سرور + لوکال)
+        /// </summary>
+        public async Task LogoutAsync()
+        {
+            StopBackgroundTasks();
+            
+            // پاکسازی کانفیگ‌های پنل از لیست v2rayN هنگام خروج
+            ClearPanelConfigs();
+
+            await MidPanelService.Instance.LogoutAsync();
+            PerformLogoutLocal();
+        }
+
+        /// <summary>
+        /// پاکسازی اطلاعات محلی
+        /// </summary>
+        private void PerformLogoutLocal()
+        {
+            if (File.Exists(TokenFileName))
+            {
+                File.Delete(TokenFileName);
+            }
+            MidPanelService.Instance.SetToken(null);
+            CurrentStatus = null;
+            LogoutTriggered?.Invoke();
+        }
+
+        private void StartBackgroundTasks()
+        {
+            _keepAliveTimer.Start();
+            _statusRefreshTimer.Start();
+            _notificationTimer.Start();
+        }
+
+        private void StopBackgroundTasks()
+        {
+            _keepAliveTimer.Stop();
+            _statusRefreshTimer.Stop();
+            _notificationTimer.Stop();
+        }
+
+        private async Task PerformKeepAlive()
+        {
+            if (!IsLoggedIn) return;
+            try
+            {
+                await MidPanelService.Instance.KeepAliveAsync();
             }
             catch (Exception ex)
             {
-                Log("LOGOUT ERROR", ex.Message, true);
-                _jwtToken = null;
-                return new ApiResponse { Message = "Logged out locally" };
+                HandleAuthError(ex);
             }
+        }
+
+        /// <summary>
+        /// دریافت وضعیت جدید و آپدیت کردن کانفیگ‌ها
+        /// </summary>
+        public async Task RefreshStatus()
+        {
+            if (!IsLoggedIn) return;
+            try
+            {
+                var status = await MidPanelService.Instance.GetStatusAsync();
+                CurrentStatus = status;
+                
+                // === منطق حیاتی: ایمپورت کردن کانفیگ‌ها به هسته ===
+                if (status.Links != null && status.Links.Count > 0)
+                {
+                    await ImportConfigs(status.Links);
+                }
+
+                StatusUpdated?.Invoke(status);
+            }
+            catch (Exception ex)
+            {
+                HandleAuthError(ex);
+            }
+        }
+
+        /// <summary>
+        /// افزودن لینک‌های دریافتی به لیست پروفایل‌های برنامه
+        /// </summary>
+        private async Task ImportConfigs(List<string> links)
+        {
+            try
+            {
+                var config = AppManager.Instance.Config;
+                bool isListChanged = false;
+
+                // 1. پاکسازی سرورهای قدیمی همین پنل (بر اساس SubId)
+                // این کار باعث می‌شود سرورهای تکراری اضافه نشوند
+                var oldItems = config.ProfileItems.Where(t => t.Subid == FireNetSubId).ToList();
+                if (oldItems.Count > 0)
+                {
+                    foreach (var item in oldItems)
+                    {
+                        config.ProfileItems.Remove(item);
+                    }
+                    isListChanged = true;
+                }
+
+                // 2. آماده‌سازی لینک‌ها برای ایمپورت
+                var linksStr = string.Join(Environment.NewLine, links);
+                
+                // 3. استفاده از متد داخلی v2rayN برای افزودن دسته‌جمعی سرورها
+                // پارامتر دوم (subid) بسیار مهم است تا بعداً بتوانیم آنها را شناسایی کنیم
+                await ConfigHandler.AddBatchServers(config, linksStr, FireNetSubId, false);
+                isListChanged = true;
+
+                // 4. لاجیک انتخاب سرور پیش‌فرض
+                // اگر هیچ سروری انتخاب نشده باشد، اولین سرور این پنل را انتخاب می‌کنیم
+                if (string.IsNullOrEmpty(config.IndexId))
+                {
+                    var firstPanelItem = config.ProfileItems.FirstOrDefault(t => t.Subid == FireNetSubId);
+                    if (firstPanelItem != null)
+                    {
+                        config.IndexId = firstPanelItem.IndexId;
+                    }
+                }
+
+                // 5. اگر تغییری در لیست ایجاد شد، به UI اطلاع می‌دهیم تا رفرش شود
+                if (isListChanged)
+                {
+                    AppEvents.ProfilesRefreshRequested.Publish();
+                }
+            }
+            catch (Exception ex)
+            {
+                // خطا در ایمپورت نباید باعث کرش برنامه شود، فقط لاگ می‌کنیم
+                MidPanelService.Instance.Log("IMPORT ERROR", ex.Message, true);
+            }
+        }
+
+        private void ClearPanelConfigs()
+        {
+            try
+            {
+                var config = AppManager.Instance.Config;
+                var oldItems = config.ProfileItems.Where(t => t.Subid == FireNetSubId).ToList();
+                foreach (var item in oldItems)
+                {
+                    config.ProfileItems.Remove(item);
+                }
+                AppEvents.ProfilesRefreshRequested.Publish();
+            }
+            catch { }
+        }
+
+        private async Task CheckNotifications()
+        {
+            if (!IsLoggedIn) return;
+            try
+            {
+                var response = await MidPanelService.Instance.FetchNotificationsAsync();
+                if (response != null && response.Notifications != null && response.Notifications.Count > 0)
+                {
+                    NotificationsReceived?.Invoke(response);
+                }
+            }
+            catch (Exception ex)
+            {
+                HandleAuthError(ex);
+            }
+        }
+
+        /// <summary>
+        /// مدیریت خطاهای احراز هویت (خروج اجباری در صورت 401/403)
+        /// </summary>
+        private void HandleAuthError(Exception ex)
+        {
+            if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized") || 
+                ex.Message.Contains("403") || ex.Message.Contains("Forbidden"))
+            {
+                StopBackgroundTasks();
+                PerformLogoutLocal();
+            }
+        }
+
+        public void ReportPromptSeen()
+        {
+             _ = MidPanelService.Instance.UpdatePromptSeenAsync();
         }
     }
 }

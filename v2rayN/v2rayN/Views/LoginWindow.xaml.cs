@@ -1,100 +1,359 @@
 using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes;
 using ServiceLib.Manager;
+using ServiceLib.Models;
+using ServiceLib.Handler; // برای دسترسی به کانفیگ
+using ServiceLib.Services; // برای لاگ
+
+using WinForms = System.Windows.Forms;
+using Drawing = System.Drawing;
 
 namespace v2rayN.Views
 {
-    /// <summary>
-    /// Interaction logic for LoginWindow.xaml
-    /// </summary>
-    public partial class LoginWindow : Window
+    public partial class MainWindow : Window
     {
-        public LoginWindow()
+        private bool _isConnected = false;
+        private WinForms.NotifyIcon _notifyIcon;
+
+        public MainWindow()
         {
             InitializeComponent();
+            InitializeSystemTray();
+
+            Loaded += MainWindow_Loaded;
             
-            // فوکوس اولیه روی فیلد نام کاربری
-            Loaded += (s, e) => txtUsername.Focus();
+            MidPanelManager.Instance.StatusUpdated += UpdateUI;
+            MidPanelManager.Instance.NotificationsReceived += OnNotificationsReceived;
+            MidPanelManager.Instance.LogoutTriggered += OnLogoutTriggered;
         }
 
-        // قابلیت جابجایی پنجره با موس (چون WindowStyle="None" است)
-        private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void InitializeSystemTray()
         {
-            if (e.ButtonState == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
-        }
-
-        // دکمه بستن برنامه
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Shutdown();
-        }
-
-        // دکمه ورود
-        private async void BtnLogin_Click(object sender, RoutedEventArgs e)
-        {
-            string username = txtUsername.Text.Trim();
-            string password = txtPassword.Password.Trim();
-
-            // 1. اعتبارسنجی ساده
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-            {
-                ShowError("Please enter username and password");
-                return;
-            }
-
-            // 2. تغییر وضعیت دکمه به حالت "در حال انجام"
-            btnLogin.IsEnabled = false;
-            btnLogin.Content = "LOGGING IN...";
-            txtError.Visibility = Visibility.Collapsed;
-
             try
             {
-                // ساخت شناسه دستگاه یکتا (ساده) و دریافت نسخه
-                string deviceId = GetDeviceId();
-                string appVersion = "3.0.0"; // یا دریافت داینامیک از اسمبلی
+                _notifyIcon = new WinForms.NotifyIcon();
+                _notifyIcon.Visible = true;
+                _notifyIcon.Text = "FireNet v2ray Client";
 
-                // 3. تلاش برای لاگین از طریق منیجر
-                await MidPanelManager.Instance.LoginAsync(username, password, deviceId, appVersion);
+                var appPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+                if (!string.IsNullOrEmpty(appPath))
+                {
+                    _notifyIcon.Icon = Drawing.Icon.ExtractAssociatedIcon(appPath);
+                }
+                else
+                {
+                    _notifyIcon.Icon = Drawing.SystemIcons.Application;
+                }
 
-                // 4. لاگین موفق: باز کردن صفحه اصلی و بستن این پنجره
-                // فرض بر این است که MainWindow قبلاً در پروژه وجود دارد
-                // اگر MainWindow سازنده‌ای دارد که پارامتر نمی‌گیرد:
-                new MainWindow().Show();
-                this.Close();
+                _notifyIcon.DoubleClick += (s, e) => 
+                {
+                    this.Show();
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+                };
             }
             catch (Exception ex)
             {
-                // 5. نمایش خطا
-                ShowError(ex.Message.Contains("401") ? "Invalid username or password" : "Connection failed. Try again.");
-                
-                // برگرداندن دکمه به حالت اول
-                btnLogin.IsEnabled = true;
-                btnLogin.Content = "LOGIN";
+                Debug.WriteLine($"Error init tray: {ex.Message}");
             }
         }
 
-        private void ShowError(string message)
+        private void OnNotificationsReceived(NotificationFetchResponse response)
         {
-            txtError.Text = message;
-            txtError.Visibility = Visibility.Visible;
-            
-            // لرزش کوچک برای جلب توجه (اختیاری)
-            // Animation logic can be added here
+            if (_notifyIcon == null || response?.Notifications == null) return;
+
+            foreach (var note in response.Notifications)
+            {
+                _notifyIcon.ShowBalloonTip(
+                    5000, 
+                    note.Title ?? "Notification", 
+                    note.Body ?? "", 
+                    WinForms.ToolTipIcon.Info
+                );
+            }
         }
 
-        /// <summary>
-        /// تولید یک شناسه دستگاه نسبتاً ثابت برای ویندوز
-        /// </summary>
-        private string GetDeviceId()
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // در محیط پروداکشن می‌توان از ترکیب مشخصات سخت‌افزاری استفاده کرد
-            // اینجا برای سادگی از MachineName استفاده می‌کنیم
-            return Environment.MachineName + "_" + Environment.UserName;
+            if (MidPanelManager.Instance.CurrentStatus != null)
+            {
+                UpdateUI(MidPanelManager.Instance.CurrentStatus);
+            }
+            else
+            {
+                 _ = MidPanelManager.Instance.RefreshStatus();
+            }
+        }
+
+        // دکمه تنظیمات - باز کردن پنجره OptionSettingWindow
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // ایجاد و نمایش پنجره تنظیمات اصلی v2rayN
+                var settingsWindow = new OptionSettingWindow();
+                settingsWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MidPanelService.Instance.Log("SETTINGS ERROR", ex.ToString(), true);
+                MessageBox.Show("Error opening settings: " + ex.Message);
+            }
+        }
+
+        private void UpdateUI(StatusResponse status)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (status == null) return;
+
+                txtUsername.Text = status.Username ?? "User";
+                
+                bool isActive = status.Status?.ToLower() == "active";
+                txtStatus.Text = isActive ? "ACTIVE" : "EXPIRED";
+                txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
+                borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
+
+                // === لاجیک محاسبه حجم (با پشتیبانی از نال) ===
+                if (status.DataLimit == null || status.DataLimit == 0)
+                {
+                    // حالت نامحدود
+                    txtTotalData.Text = "Unlimited Data";
+                    txtRemainingData.Text = "∞";
+                    DrawCircularProgress(pathUsageArc, 1.0, "#3180e5"); // دایره کامل
+                }
+                else
+                {
+                    long limit = status.DataLimit.Value;
+                    long used = status.UsedTraffic ?? 0;
+                    long remaining = limit - used;
+                    if (remaining < 0) remaining = 0;
+
+                    double totalGB = limit / 1073741824.0;
+                    double remainingGB = remaining / 1073741824.0;
+
+                    txtRemainingData.Text = $"{remainingGB:0.##} GB";
+                    txtTotalData.Text = $"Total: {totalGB:0.##} GB";
+
+                    double usagePercent = (double)used / limit;
+                    double remainingPercent = 1.0 - usagePercent;
+                    if (remainingPercent < 0) remainingPercent = 0;
+
+                    DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
+                }
+
+                // === لاجیک محاسبه زمان (با پشتیبانی از نال) ===
+                if (status.Expire == null || status.Expire == 0)
+                {
+                    // حالت زمان نامحدود
+                    txtRemainingDays.Text = "∞";
+                    txtExpireDate.Text = "No Expiry";
+                    DrawCircularProgress(pathDaysArc, 1.0, "#5255ca");
+                }
+                else
+                {
+                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire.Value).LocalDateTime;
+                    txtExpireDate.Text = $"Expire: {expireDate:yyyy-MM-dd}";
+
+                    TimeSpan left = expireDate - DateTime.Now;
+                    int daysLeft = left.Days;
+                    if (daysLeft < 0) daysLeft = 0;
+
+                    txtRemainingDays.Text = daysLeft.ToString();
+
+                    // فرض سقف 30 روز برای گرافیک
+                    double daysPercent = (daysLeft > 30) ? 1.0 : (double)daysLeft / 30.0;
+                    DrawCircularProgress(pathDaysArc, daysPercent, "#5255ca");
+                }
+
+                CheckForUpdate(status);
+            });
+        }
+
+        private void DrawCircularProgress(System.Windows.Shapes.Path pathObj, double percentage, string colorHex)
+        {
+            if (percentage > 0.999) percentage = 0.9999;
+
+            double angle = percentage * 360;
+            double radius = 40; // شعاع باید نصف Width (80) باشد
+            double startAngle = -90;
+            double endAngle = startAngle + angle;
+
+            Point startPoint = new Point(
+                radius + radius * Math.Cos(startAngle * Math.PI / 180),
+                radius + radius * Math.Sin(startAngle * Math.PI / 180));
+
+            Point endPoint = new Point(
+                radius + radius * Math.Cos(endAngle * Math.PI / 180),
+                radius + radius * Math.Sin(endAngle * Math.PI / 180));
+
+            bool isLargeArc = angle > 180;
+
+            PathFigure figure = new PathFigure();
+            figure.StartPoint = startPoint;
+            figure.Segments.Add(new ArcSegment(
+                endPoint,
+                new Size(radius, radius),
+                0,
+                isLargeArc,
+                SweepDirection.Clockwise,
+                true));
+
+            PathGeometry geometry = new PathGeometry();
+            geometry.Figures.Add(figure);
+
+            pathObj.Data = geometry;
+            pathObj.Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
+        }
+
+        private void CheckForUpdate(StatusResponse status)
+        {
+            if (status.NeedToUpdate)
+            {
+                popupContainer.Visibility = Visibility.Visible;
+                if (status.IsIgnoreable)
+                {
+                    btnUpdateLater.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    btnUpdateLater.Visibility = Visibility.Collapsed;
+                }
+                MidPanelManager.Instance.ReportPromptSeen();
+            }
+            else
+            {
+                popupContainer.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BtnUpdateNow_Click(object sender, RoutedEventArgs e)
+        {
+            try 
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://sub.your-domain.com/download-latest", 
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
+        private void BtnUpdateLater_Click(object sender, RoutedEventArgs e)
+        {
+            popupContainer.Visibility = Visibility.Collapsed;
+        }
+
+        // دکمه اتصال واقعی همراه با لاگ
+        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
+        {
+            // جلوگیری از کلیک‌های پشت سر هم
+            btnConnect.IsEnabled = false;
+            
+            try 
+            {
+                _isConnected = !_isConnected;
+                UpdateConnectionUI(_isConnected);
+
+                MidPanelService.Instance.Log("CONNECTION CLICK", $"User clicked connect. Target State: {(_isConnected ? "ON" : "OFF")}");
+
+                if (_isConnected)
+                {
+                    // === روشن کردن وی‌پی‌ان ===
+                    MidPanelService.Instance.Log("CORE START", "Fetching default server...");
+                    
+                    // 1. دریافت سرور انتخاب شده (دیفالت)
+                    var config = AppManager.Instance.Config;
+                    var node = await ConfigHandler.GetDefaultServer(config);
+                    
+                    if (node == null)
+                    {
+                        MidPanelService.Instance.Log("CORE ERROR", "No default server selected!", true);
+                        MessageBox.Show("Please select a server in settings first.");
+                        _isConnected = false;
+                        UpdateConnectionUI(false);
+                        return;
+                    }
+
+                    MidPanelService.Instance.Log("CORE START", $"Starting core with server: {node.Remarks}");
+                    
+                    // 2. استارت هسته
+                    await CoreManager.Instance.LoadCore(node);
+                    
+                    MidPanelService.Instance.Log("CORE STARTED", "Core loaded successfully.");
+                }
+                else
+                {
+                    // === خاموش کردن وی‌پی‌ان ===
+                    MidPanelService.Instance.Log("CORE STOP", "Stopping core...");
+                    await CoreManager.Instance.CoreStop();
+                    MidPanelService.Instance.Log("CORE STOPPED", "Core stopped successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MidPanelService.Instance.Log("CONNECTION EXCEPTION", ex.ToString(), true);
+                MessageBox.Show($"Connection Error: {ex.Message}");
+                
+                // در صورت خطا، دکمه را به حالت خاموش برگردان
+                _isConnected = false;
+                UpdateConnectionUI(false);
+            }
+            finally
+            {
+                btnConnect.IsEnabled = true;
+            }
+        }
+
+        private void UpdateConnectionUI(bool connected)
+        {
+            var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
+            var dropShadow = outerRing?.Effect as DropShadowEffect;
+
+            if (connected)
+            {
+                txtConnectionState.Text = "CONNECTED";
+                txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
+                btnConnect.Opacity = 1.0;
+                
+                if (dropShadow != null) dropShadow.Color = Color.FromRgb(49, 128, 229);
+            }
+            else
+            {
+                txtConnectionState.Text = "DISCONNECTED";
+                txtConnectionState.Foreground = Brushes.White;
+                btnConnect.Opacity = 0.8;
+                
+                if (dropShadow != null) dropShadow.Color = Color.FromRgb(82, 85, 202); 
+            }
+        }
+
+        private async void BtnLogout_Click(object sender, RoutedEventArgs e)
+        {
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
+            await MidPanelManager.Instance.LogoutAsync();
+        }
+
+        private void OnLogoutTriggered()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                new LoginWindow().Show();
+                this.Close();
+            });
         }
     }
 }
