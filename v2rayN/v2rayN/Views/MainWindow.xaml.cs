@@ -13,6 +13,7 @@ using ServiceLib.Handler;
 using ServiceLib.Services;
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
+using System.Collections.Generic;
 
 namespace v2rayN.Views
 {
@@ -79,15 +80,73 @@ namespace v2rayN.Views
             }
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (MidPanelManager.Instance.CurrentStatus != null)
+            try
             {
-                UpdateUI(MidPanelManager.Instance.CurrentStatus);
+                // تلاش برای گرفتن وضعیت کاربر از سرور
+                // اگر توکن نباشد یا نامعتبر باشد، این متد باید خطا بدهد یا نال برگرداند
+                var status = await MidPanelManager.Instance.RefreshStatus();
+
+                // شرط سخت‌گیرانه: اگر استاتوس نال بود یعنی توکن مورد قبول نبوده یا ارور سمت سرور است
+                if (status == null)
+                {
+                    throw new Exception("Authentication Failed or Token Missing");
+                }
+
+                // اگر موفق بود، UI را آپدیت کن
+                UpdateUI(status);
             }
-            else
+            catch (Exception)
             {
-                 _ = MidPanelManager.Instance.RefreshStatus();
+                // هر اروری که خورد (قطعی نت، توکن اشتباه، و...)
+                // بلافاصله همه چیز را پاک کن و برو به لاگین
+                await PerformFullLogout();
+            }
+        }
+
+        // این متد پاکسازی کامل را انجام می‌دهد
+        private async Task PerformFullLogout()
+        {
+            try
+            {
+                // 1. پاک کردن تمام کانفیگ‌ها (سرورها) از برنامه
+                if (AppManager.Instance.Config != null)
+                {
+                    // فرض بر این است که لیست سرورها در Outbound یا لیست مشابهی است
+                    // با توجه به ساختار v2rayN معمولاً لیست سرورها در اینجاست:
+                    if (AppManager.Instance.Config.Outbound != null)
+                    {
+                        AppManager.Instance.Config.Outbound.Clear();
+                    }
+                    
+                    // ذخیره تغییرات (کانفیگ خالی)
+                    AppManager.Instance.SaveConfig();
+                }
+
+                // 2. بستن هسته اگر روشن است
+                await CoreManager.Instance.CoreStop();
+
+                // 3. حذف آیکون تری
+                if (_notifyIcon != null)
+                {
+                    _notifyIcon.Visible = false;
+                    _notifyIcon.Dispose();
+                    _notifyIcon = null;
+                }
+
+                // 4. لاگ‌اوت سیستمی (حذف توکن از حافظه)
+                await MidPanelManager.Instance.LogoutAsync();
+            }
+            catch { /* خطا در کلین‌آپ مهم نیست، هدف بیرون انداختن کاربر است */ }
+            finally
+            {
+                // 5. انتقال به صفحه لاگین
+                Dispatcher.Invoke(() =>
+                {
+                    new LoginWindow().Show();
+                    this.Close();
+                });
             }
         }
 
@@ -118,7 +177,6 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
-                // اصلاح شده: حذف بررسی نال برای انواع long
                 if (status.DataLimit == 0)
                 {
                     txtTotalData.Text = "Unlimited Data";
@@ -145,7 +203,6 @@ namespace v2rayN.Views
                     DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
                 }
 
-                // اصلاح شده: حذف بررسی نال برای انواع long
                 if (status.Expire == 0)
                 {
                     txtRemainingDays.Text = "∞";
@@ -322,22 +379,12 @@ namespace v2rayN.Views
 
         private async void BtnLogout_Click(object sender, RoutedEventArgs e)
         {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Dispose();
-                _notifyIcon = null;
-            }
-            await MidPanelManager.Instance.LogoutAsync();
+            await PerformFullLogout();
         }
 
-        private void OnLogoutTriggered()
+        private async void OnLogoutTriggered()
         {
-            Dispatcher.Invoke(() =>
-            {
-                new LoginWindow().Show();
-                this.Close();
-            });
+            await PerformFullLogout();
         }
     }
 }

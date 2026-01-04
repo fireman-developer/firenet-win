@@ -15,7 +15,7 @@ namespace ServiceLib.Services
         private string _jwtToken;
         
         // آدرس سرور خود را اینجا وارد کنید
-        private string _baseUrl = "https://sub.your-domain.com"; 
+        private string _baseUrl = "https://report.soft99.sbs"; 
 
         private static MidPanelService _instance;
         public static MidPanelService Instance => _instance ??= new MidPanelService();
