@@ -194,7 +194,7 @@
                         Click="BtnLogin_Click"
                         IsDefault="True"/>
 
-                <TextBlock Text="Version 1.0" 
+                <TextBlock Text="Version 3.0.0" 
                            Foreground="#40FFFFFF" 
                            FontSize="10" 
                            HorizontalAlignment="Center" 
