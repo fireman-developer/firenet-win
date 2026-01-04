@@ -11,9 +11,11 @@ using ServiceLib.Manager;
 using ServiceLib.Models;
 using ServiceLib.Handler;
 using ServiceLib.Services;
+using System.Collections.Generic;
+
+// آلیاس برای جلوگیری از تداخل نام‌ها
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
-using System.Collections.Generic;
 
 namespace v2rayN.Views
 {
@@ -27,6 +29,7 @@ namespace v2rayN.Views
             InitializeComponent();
             InitializeSystemTray();
 
+            // اتصال ایونت‌ها
             Loaded += MainWindow_Loaded;
             
             MidPanelManager.Instance.StatusUpdated += UpdateUI;
@@ -34,6 +37,7 @@ namespace v2rayN.Views
             MidPanelManager.Instance.LogoutTriggered += OnLogoutTriggered;
         }
 
+        // --- بخش System Tray (آیکون کنار ساعت) ---
         private void InitializeSystemTray()
         {
             try
@@ -80,32 +84,33 @@ namespace v2rayN.Views
             }
         }
 
+        // --- لود شدن پنجره و بررسی امنیت توکن ---
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                // تلاش برای گرفتن وضعیت کاربر از سرور
-                // اگر توکن نباشد یا نامعتبر باشد، این متد باید خطا بدهد یا نال برگرداند
-                var status = await MidPanelManager.Instance.RefreshStatus();
+                // تلاش برای دریافت وضعیت کاربر از سرور
+                // اصلاح: چون RefreshStatus مقدار برنمی‌گرداند، ابتدا await می‌کنیم سپس مقدار را از پراپرتی می‌خوانیم
+                await MidPanelManager.Instance.RefreshStatus();
+                var status = MidPanelManager.Instance.CurrentStatus;
 
-                // شرط سخت‌گیرانه: اگر استاتوس نال بود یعنی توکن مورد قبول نبوده یا ارور سمت سرور است
+                // قانون سخت‌گیرانه: اگر استاتوس نال بود (توکن نامعتبر/خطای سرور)
                 if (status == null)
                 {
-                    throw new Exception("Authentication Failed or Token Missing");
+                    throw new Exception("Security Check Failed: Token invalid or server unreachable.");
                 }
 
-                // اگر موفق بود، UI را آپدیت کن
+                // اگر همه چیز درست بود، UI را آپدیت کن
                 UpdateUI(status);
             }
             catch (Exception)
             {
-                // هر اروری که خورد (قطعی نت، توکن اشتباه، و...)
-                // بلافاصله همه چیز را پاک کن و برو به لاگین
+                // در صورت هرگونه خطا در احراز هویت یا ارتباط اولیه:
                 await PerformFullLogout();
             }
         }
 
-        // این متد پاکسازی کامل را انجام می‌دهد
+        // --- متد پاکسازی کامل و خروج ---
         private async Task PerformFullLogout()
         {
             try
@@ -113,21 +118,21 @@ namespace v2rayN.Views
                 // 1. پاک کردن تمام کانفیگ‌ها (سرورها) از برنامه
                 if (AppManager.Instance.Config != null)
                 {
-                    // فرض بر این است که لیست سرورها در Outbound یا لیست مشابهی است
-                    // با توجه به ساختار v2rayN معمولاً لیست سرورها در اینجاست:
-                    if (AppManager.Instance.Config.Outbound != null)
+                    // اصلاح: Outbound وجود ندارد، نام صحیح ProfileItems است
+                    if (AppManager.Instance.Config.ProfileItems != null)
                     {
-                        AppManager.Instance.Config.Outbound.Clear();
+                        AppManager.Instance.Config.ProfileItems.Clear();
                     }
                     
-                    // ذخیره تغییرات (کانفیگ خالی)
-                    AppManager.Instance.SaveConfig();
+                    // اصلاح: متد SaveConfig در ConfigHandler است
+                    await ConfigHandler.SaveConfig(AppManager.Instance.Config);
                 }
 
-                // 2. بستن هسته اگر روشن است
+                // 2. خاموش کردن هسته (Core) اگر روشن است
                 await CoreManager.Instance.CoreStop();
+                _isConnected = false;
 
-                // 3. حذف آیکون تری
+                // 3. حذف آیکون System Tray
                 if (_notifyIcon != null)
                 {
                     _notifyIcon.Visible = false;
@@ -135,13 +140,16 @@ namespace v2rayN.Views
                     _notifyIcon = null;
                 }
 
-                // 4. لاگ‌اوت سیستمی (حذف توکن از حافظه)
+                // 4. لاگ‌اوت سیستمی (حذف توکن از مموری/دیسک)
                 await MidPanelManager.Instance.LogoutAsync();
             }
-            catch { /* خطا در کلین‌آپ مهم نیست، هدف بیرون انداختن کاربر است */ }
+            catch 
+            { 
+                // خطا در هنگام پاکسازی نباید مانع بسته شدن پنجره شود
+            }
             finally
             {
-                // 5. انتقال به صفحه لاگین
+                // 5. انتقال کاربر به صفحه لاگین
                 Dispatcher.Invoke(() =>
                 {
                     new LoginWindow().Show();
@@ -149,6 +157,8 @@ namespace v2rayN.Views
                 });
             }
         }
+
+        // --- تعاملات UI (دکمه‌ها و نمایشگرها) ---
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
@@ -177,6 +187,7 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
+                // محاسبه حجم مصرفی (Data Limit)
                 if (status.DataLimit == 0)
                 {
                     txtTotalData.Text = "Unlimited Data";
@@ -203,6 +214,7 @@ namespace v2rayN.Views
                     DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
                 }
 
+                // محاسبه زمان باقی‌مانده (Expire)
                 if (status.Expire == 0)
                 {
                     txtRemainingDays.Text = "∞";
