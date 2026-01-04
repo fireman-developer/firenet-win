@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,8 +9,8 @@ using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using ServiceLib.Manager;
 using ServiceLib.Models;
-
-// برای استفاده از NotifyIcon ویندوز
+using ServiceLib.Handler;
+using ServiceLib.Services;
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
@@ -90,6 +91,20 @@ namespace v2rayN.Views
             }
         }
 
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var settingsWindow = new OptionSettingWindow();
+                settingsWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MidPanelService.Instance.Log("SETTINGS ERROR", ex.ToString(), true);
+                MessageBox.Show("Error opening settings: " + ex.Message);
+            }
+        }
+
         private void UpdateUI(StatusResponse status)
         {
             Dispatcher.Invoke(() =>
@@ -103,23 +118,41 @@ namespace v2rayN.Views
                 txtStatus.Foreground = isActive ? new SolidColorBrush(Color.FromRgb(49, 128, 229)) : Brushes.Red;
                 borderStatus.Background = isActive ? new SolidColorBrush(Color.FromArgb(32, 49, 128, 229)) : new SolidColorBrush(Color.FromArgb(32, 255, 0, 0));
 
-                double totalGB = status.DataLimit / 1073741824.0;
-                double usedGB = status.UsedTraffic / 1073741824.0;
-                double remainingGB = totalGB - usedGB;
-                if (remainingGB < 0) remainingGB = 0;
-
-                txtRemainingData.Text = $"{remainingGB:0.##} GB";
-                txtTotalData.Text = $"Total: {totalGB:0.##} GB";
-
-                double usagePercent = (status.DataLimit > 0) ? (double)status.UsedTraffic / status.DataLimit : 1;
-                double remainingPercent = 1.0 - usagePercent;
-                if (remainingPercent < 0) remainingPercent = 0;
-
-                DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
-
-                if (status.Expire > 0)
+                if (status.DataLimit == null || status.DataLimit == 0)
                 {
-                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire).LocalDateTime;
+                    txtTotalData.Text = "Unlimited Data";
+                    txtRemainingData.Text = "∞";
+                    DrawCircularProgress(pathUsageArc, 1.0, "#3180e5");
+                }
+                else
+                {
+                    long limit = status.DataLimit.Value;
+                    long used = status.UsedTraffic ?? 0;
+                    long remaining = limit - used;
+                    if (remaining < 0) remaining = 0;
+
+                    double totalGB = limit / 1073741824.0;
+                    double remainingGB = remaining / 1073741824.0;
+
+                    txtRemainingData.Text = $"{remainingGB:0.##} GB";
+                    txtTotalData.Text = $"Total: {totalGB:0.##} GB";
+
+                    double usagePercent = (double)used / limit;
+                    double remainingPercent = 1.0 - usagePercent;
+                    if (remainingPercent < 0) remainingPercent = 0;
+
+                    DrawCircularProgress(pathUsageArc, remainingPercent, "#3180e5");
+                }
+
+                if (status.Expire == null || status.Expire == 0)
+                {
+                    txtRemainingDays.Text = "∞";
+                    txtExpireDate.Text = "No Expiry";
+                    DrawCircularProgress(pathDaysArc, 1.0, "#5255ca");
+                }
+                else
+                {
+                    DateTime expireDate = DateTimeOffset.FromUnixTimeSeconds(status.Expire.Value).LocalDateTime;
                     txtExpireDate.Text = $"Expire: {expireDate:yyyy-MM-dd}";
 
                     TimeSpan left = expireDate - DateTime.Now;
@@ -130,12 +163,6 @@ namespace v2rayN.Views
 
                     double daysPercent = (daysLeft > 30) ? 1.0 : (double)daysLeft / 30.0;
                     DrawCircularProgress(pathDaysArc, daysPercent, "#5255ca");
-                }
-                else
-                {
-                    txtRemainingDays.Text = "∞";
-                    txtExpireDate.Text = "No Expiry";
-                    DrawCircularProgress(pathDaysArc, 1.0, "#5255ca");
                 }
 
                 CheckForUpdate(status);
@@ -205,7 +232,7 @@ namespace v2rayN.Views
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "https://sub.your-domain.com/download-latest", // لینک دانلود را تنظیم کنید
+                    FileName = "https://sub.your-domain.com/download-latest", 
                     UseShellExecute = true
                 });
             }
@@ -217,23 +244,69 @@ namespace v2rayN.Views
             popupContainer.Visibility = Visibility.Collapsed;
         }
 
-        private void BtnConnect_Click(object sender, RoutedEventArgs e)
+        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
-            _isConnected = !_isConnected;
+            btnConnect.IsEnabled = false;
+            
+            try 
+            {
+                _isConnected = !_isConnected;
+                UpdateConnectionUI(_isConnected);
 
+                MidPanelService.Instance.Log("CONNECTION CLICK", $"User clicked connect. Target State: {(_isConnected ? "ON" : "OFF")}");
+
+                if (_isConnected)
+                {
+                    MidPanelService.Instance.Log("CORE START", "Fetching default server...");
+                    
+                    var config = AppManager.Instance.Config;
+                    var node = await ConfigHandler.GetDefaultServer(config);
+                    
+                    if (node == null)
+                    {
+                        MidPanelService.Instance.Log("CORE ERROR", "No default server selected!", true);
+                        MessageBox.Show("Please select a server in settings first.");
+                        _isConnected = false;
+                        UpdateConnectionUI(false);
+                        return;
+                    }
+
+                    MidPanelService.Instance.Log("CORE START", $"Starting core with server: {node.Remarks}");
+                    await CoreManager.Instance.LoadCore(node);
+                    MidPanelService.Instance.Log("CORE STARTED", "Core loaded successfully.");
+                }
+                else
+                {
+                    MidPanelService.Instance.Log("CORE STOP", "Stopping core...");
+                    await CoreManager.Instance.CoreStop();
+                    MidPanelService.Instance.Log("CORE STOPPED", "Core stopped successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MidPanelService.Instance.Log("CONNECTION EXCEPTION", ex.ToString(), true);
+                MessageBox.Show($"Connection Error: {ex.Message}");
+                _isConnected = false;
+                UpdateConnectionUI(false);
+            }
+            finally
+            {
+                btnConnect.IsEnabled = true;
+            }
+        }
+
+        private void UpdateConnectionUI(bool connected)
+        {
             var outerRing = btnConnect.Template.FindName("outerRing", btnConnect) as System.Windows.Shapes.Ellipse;
             var dropShadow = outerRing?.Effect as DropShadowEffect;
 
-            if (_isConnected)
+            if (connected)
             {
                 txtConnectionState.Text = "CONNECTED";
                 txtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(49, 128, 229));
                 btnConnect.Opacity = 1.0;
                 
-                if (dropShadow != null)
-                {
-                    dropShadow.Color = Color.FromRgb(49, 128, 229);
-                }
+                if (dropShadow != null) dropShadow.Color = Color.FromRgb(49, 128, 229);
             }
             else
             {
@@ -241,10 +314,7 @@ namespace v2rayN.Views
                 txtConnectionState.Foreground = Brushes.White;
                 btnConnect.Opacity = 0.8;
                 
-                if (dropShadow != null)
-                {
-                    dropShadow.Color = Color.FromRgb(82, 85, 202); 
-                }
+                if (dropShadow != null) dropShadow.Color = Color.FromRgb(82, 85, 202); 
             }
         }
 

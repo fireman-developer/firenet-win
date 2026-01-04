@@ -18,12 +18,12 @@ using Drawing = System.Drawing;
 
 namespace v2rayN.Views
 {
-    public partial class MainWindow : Window
+    public partial class LoginWindow : Window
     {
         private bool _isConnected = false;
         private WinForms.NotifyIcon _notifyIcon;
 
-        public MainWindow()
+        public LoginWindow()
         {
             InitializeComponent();
             InitializeSystemTray();
