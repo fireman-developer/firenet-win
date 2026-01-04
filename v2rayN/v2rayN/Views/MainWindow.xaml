@@ -1,106 +1,209 @@
-using System;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using ServiceLib.Manager;
+<Window x:Class="v2rayN.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="FireNet Dashboard" Height="700" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        WindowStyle="SingleBorderWindow"
+        Background="#1a1c4b">
 
-namespace v2rayN.Views
-{
-    public partial class LoginWindow : Window
-    {
-        public LoginWindow()
-        {
-            InitializeComponent();
-        }
+    <Window.Resources>
+        <Style x:Key="ConnectButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="outerRing" Width="130" Height="130" Stroke="#5255ca" StrokeThickness="3" Opacity="0.6">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect Color="#5255ca" BlurRadius="25" ShadowDepth="0"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            
+                            <Ellipse x:Name="circle" Width="110" Height="110">
+                                <Ellipse.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#5255ca" Offset="0"/>
+                                        <GradientStop Color="#3180e5" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            
+                            <Path x:Name="icon" Data="M10,0 A10,10 0 1 0 30,10 M20,0 L20,20" 
+                                  Stroke="White" StrokeThickness="4" StrokeEndLineCap="Round"
+                                  Width="35" Height="35" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0" CenterX="17.5" CenterY="17.5"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="circle" Property="Opacity" Value="0.9"/>
+                                <Setter TargetName="outerRing" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="circle" Property="Width" Value="105"/>
+                                <Setter TargetName="circle" Property="Height" Value="105"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        private async void BtnLogin_Click(object sender, RoutedEventArgs e)
-        {
-            string username = txtUsername.Text;
-            string password = txtPassword.Password;
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#AAFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="5" Padding="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#20FFFFFF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            {
-                MessageBox.Show("Please enter username and password.");
-                return;
-            }
+    <Grid>
+        <Border>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#1a1c4b" Offset="0"/>
+                    <GradientStop Color="#0f1126" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
 
-            btnLogin.IsEnabled = false;
-            btnLogin.Content = "Logging in...";
+        <StackPanel Margin="25">
+            <Grid Margin="0,0,0,25">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="FireNet" Foreground="White" FontWeight="Bold" FontSize="20"/>
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnSettings" Style="{StaticResource HeaderButtonStyle}" Click="BtnSettings_Click" ToolTip="Settings">
+                        <TextBlock Text="⚙" FontSize="18"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
 
-            try
-            {
-                string deviceId = GetDeviceId();
-                // بهتر است ورژن را داینامیک بگیریم
-                string appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            <Border Background="#15FFFFFF" CornerRadius="20" Padding="20" Margin="0,0,0,40" BorderBrush="#30FFFFFF" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Hello," Foreground="#88FFFFFF" FontSize="14"/>
+                        <TextBlock x:Name="txtUsername" Text="User" Foreground="White" FontSize="22" FontWeight="Bold" Margin="0,5,0,5"/>
+                        <Border x:Name="borderStatus" Background="#203180e5" CornerRadius="8" HorizontalAlignment="Left" Padding="10,4">
+                            <TextBlock x:Name="txtStatus" Text="Checking..." Foreground="#3180e5" FontSize="12" FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
 
-                await MidPanelManager.Instance.LoginAsync(username, password, deviceId, appVersion);
+                    <Border Grid.Column="1" Width="50" Height="50" CornerRadius="25" Background="#3180e5" VerticalAlignment="Center">
+                        <TextBlock Text="👤" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/>
+                    </Border>
+                </Grid>
+            </Border>
 
-                if (MidPanelManager.Instance.IsLoggedIn)
-                {
-                    new MainWindow().Show();
-                    this.Close();
-                }
-                else
-                {
-                    MessageBox.Show("Login failed. Please check credentials.");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error: {ex.Message}");
-            }
-            finally
-            {
-                btnLogin.IsEnabled = true;
-                btnLogin.Content = "LOGIN";
-            }
-        }
+            <Grid Height="180" Margin="0,0,0,10">
+                <Button x:Name="btnConnect" Style="{StaticResource ConnectButtonStyle}" Click="BtnConnect_Click" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+            
+            <TextBlock x:Name="txtConnectionState" Text="DISCONNECTED" Foreground="#88FFFFFF" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Center" Margin="0,0,0,40"/>
 
-<<<<<<< HEAD
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/> 
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="#10FFFFFF" CornerRadius="18" Padding="15" BorderBrush="#20FFFFFF" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Traffic" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <Grid Width="80" Height="80" HorizontalAlignment="Center">
+                            <Ellipse Stroke="#20FFFFFF" StrokeThickness="5"/>
+                            <Path x:Name="pathUsageArc" Stroke="#3180e5" StrokeThickness="5" StrokeEndLineCap="Round" Width="80" Height="80" Stretch="None"/>
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock x:Name="txtRemainingData" Text="-" Foreground="White" FontWeight="Bold" FontSize="13" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="txtTotalData" Text="Total: -" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Background="#10FFFFFF" CornerRadius="18" Padding="15" BorderBrush="#20FFFFFF" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Time Left" Foreground="#88FFFFFF" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <Grid Width="80" Height="80" HorizontalAlignment="Center">
+                            <Ellipse Stroke="#20FFFFFF" StrokeThickness="5"/>
+                            <Path x:Name="pathDaysArc" Stroke="#5255ca" StrokeThickness="5" StrokeEndLineCap="Round" Width="80" Height="80" Stretch="None"/>
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock x:Name="txtRemainingDays" Text="-" Foreground="White" FontWeight="Bold" FontSize="16" TextAlignment="Center"/>
+                                <TextBlock Text="Days" Foreground="#88FFFFFF" FontSize="10" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="txtExpireDate" Text="Expire: -" Foreground="#60FFFFFF" FontSize="11" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
             <Button x:Name="btnLogout"
                     Content="LOG OUT" 
-                    Background="#20FF5555" 
+                    Background="#15FF5555" 
                     Foreground="#FF5555" 
                     FontWeight="Bold"
-                    BorderThickness="0" 
-                    Height="40"
-                    Margin="0,40,0,0" 
+                    BorderThickness="1"
+                    BorderBrush="#30FF5555"
+                    Height="45"
+                    Margin="0,20,0,0" 
                     Cursor="Hand"
                     Click="BtnLogout_Click">
                 <Button.Resources>
                     <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="10"/>
+                        <Setter Property="CornerRadius" Value="12"/>
                     </Style>
                 </Button.Resources>
             </Button>
         </StackPanel>
         
         <Grid x:Name="popupContainer" Visibility="Collapsed" Background="#CC000000">
-            <Border Width="300" Background="#1a1c4b" CornerRadius="15" Padding="20" VerticalAlignment="Center" BorderBrush="#3180e5" BorderThickness="1">
+            <Border Width="300" Background="#1a1c4b" CornerRadius="20" Padding="25" VerticalAlignment="Center" BorderBrush="#3180e5" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" Color="Black" Opacity="0.5"/>
+                </Border.Effect>
                 <StackPanel>
-                    <TextBlock Text="🚀 Update Available!" Foreground="White" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
-                    <TextBlock Text="A new version of FireNet is available." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20" FontSize="13"/>
+                    <TextBlock Text="🚀 Update Available" Foreground="White" FontWeight="Bold" FontSize="18" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+                    <TextBlock Text="A new version is available. Please update for the best experience." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,25" FontSize="14" TextAlignment="Center"/>
                     
-                    <Button x:Name="btnUpdateNow" Content="Update Now" Background="#3180e5" Foreground="White" Height="35" Margin="0,0,0,10" Click="BtnUpdateNow_Click"/>
-                    <Button x:Name="btnUpdateLater" Content="Later" Background="Transparent" Foreground="#88FFFFFF" BorderThickness="0" Click="BtnUpdateLater_Click"/>
+                    <Button x:Name="btnUpdateNow" Content="Update Now" Background="#3180e5" Foreground="White" Height="40" Margin="0,0,0,10" Click="BtnUpdateNow_Click">
+                         <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="10"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                    <Button x:Name="btnUpdateLater" Content="Remind me later" Background="Transparent" Foreground="#88FFFFFF" BorderThickness="0" Click="BtnUpdateLater_Click"/>
                 </StackPanel>
             </Border>
         </Grid>
     </Grid>
 </Window>
-
-=======
-        private string GetDeviceId()
-        {
-            return Environment.MachineName + "_" + Environment.UserName;
-        }
-
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
-        }
-    }
-}
-
->>>>>>> 58ec495f24a0ff988a92aa7e9d7afa50d8048041
